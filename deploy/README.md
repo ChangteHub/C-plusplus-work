@@ -4,7 +4,13 @@
 
 2026 年 10 月 11 日首次部署到 [https://swustmarket.xyz](https://swustmarket.xyz)，公网验证完成。后端、Nginx 和 `certbot.timer` 均已启用开机启动；证书模拟续期通过，续期后的 Nginx reload 钩子也已运行验证。首次部署的空数据库备份位于 `/var/backups/school-personnel/school-20261011-initial.db`。
 
-同日已更新为教师、行政人员、学生、普通工作者四类人员版本，当前发布目录是 `/opt/school-personnel/releases/20261011-four-types`。Windows 和 Ubuntu 的 16 组接口测试及控制台测试均通过。更新前后数据库备份分别为 `/var/backups/school-personnel/school-20261011-before-four-types.db` 和 `/var/backups/school-personnel/school-20261011-after-four-types.db`；原有人员记录经逐字段比对保留，公网新增类别的验证记录已删除。网站账号和密码保持原配置。
+同日此前已发布教师、行政人员、学生、普通工作者四类人员版本，当时发布目录为 `/opt/school-personnel/releases/20261011-four-types`。Windows 和 Ubuntu 的 16 组接口测试及控制台测试均通过。更新前后数据库备份分别为 `/var/backups/school-personnel/school-20261011-before-four-types.db` 和 `/var/backups/school-personnel/school-20261011-after-four-types.db`；原有人员记录经逐字段比对保留，公网新增类别的验证记录已删除。网站账号和密码保持原配置。
+
+2026 年 10 月 11 日已完成个人账号、研究生及课程成绩版本发布。当前目录为 /opt/school-personnel/releases/20261011-academic，程序源码提交为 03addf08bc9d6cae29ce78a9d3dd192360b3ffb7。Ubuntu 上 CMake Release 编译、CTest 模型断言、16 组接口回归、7 组新增验收和控制台测试全部通过。
+
+公网 HTTPS 验收通过：公开登录页、业务接口认证、Secure/HttpOnly/SameSite Cookie、个人开户、研究生字段、授课权限、并列排名、完整文件导出、跨站请求拒绝，以及重启后账号、课程、成绩和有效个人会话保存。重启过程中 Nginx 可短暂返回 502，验收会等待后端恢复就绪。临时 QAAC_20261011_ 记录已清理，原有 1 条人员记录逐字段保留，正式账号/课程/成绩新增表均为空；实际使用时由管理员录入课程和成绩。
+
+发布前备份 /var/backups/school-personnel/school-20261011-before-academic.db，发布后备份 /var/backups/school-personnel/school-20261011-after-academic.db，完整性检查通过。网站管理员账号密码和环境配置保持原样，后端与 Nginx 继续启用，certbot.timer 保持已有配置。旧发布目录保留用于回退，若录入研究生或账号课程数据后回退，需按完整数据库备份处理。
 
 ## 目录与服务
 

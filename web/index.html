@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aurora · 学校人员信息管理系统</title>
+  <meta name="description" content="学校教师与行政人员的查询、录入和管理" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=20261011" />
+</head>
+<body>
+  <div class="aurora-bg" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+    <div class="noise"></div>
+  </div>
+
+  <header class="topbar glass" id="pageHeader">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-title">Aurora</span>
+        <span class="brand-sub">学校人员信息管理系统</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="connBadge" class="conn-badge" title="连接状态" role="status">
+        <span class="dot"></span><span id="connText">连接中…</span>
+      </span>
+      <button class="btn btn-primary" id="btnAdd" type="button" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        添加人员
+      </button>
+    </div>
+  </header>
+
+  <main class="container" id="pageMain">
+    <div class="page-intro">
+      <div><span class="eyebrow">CAMPUS DIRECTORY</span><h1>人员管理</h1><p>统一管理学校教师与行政人员信息</p></div>
+      <button id="btnRetry" class="btn btn-ghost" type="button">刷新列表</button>
+    </div>
+    <div id="connectionNotice" class="connection-notice" role="status" aria-live="polite">正在连接服务器，加载人员信息…</div>
+    <section class="stats-grid" id="statsGrid" aria-label="全部人员统计">
+      <div class="stat-card glass reveal" style="--d:0ms">
+        <div class="stat-icon icon-total">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">总人数</span>
+          <span class="stat-value" id="statTotal">—</span>
+        </div>
+      </div>
+      <div class="stat-card glass reveal" style="--d:80ms">
+        <div class="stat-icon icon-teacher">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">教师</span>
+          <span class="stat-value" id="statTeacher">—</span>
+        </div>
+      </div>
+      <div class="stat-card glass reveal" style="--d:160ms">
+        <div class="stat-icon icon-admin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">行政人员</span>
+          <span class="stat-value" id="statAdmin">—</span>
+        </div>
+      </div>
+      <div class="stat-card glass reveal" style="--d:240ms">
+        <div class="stat-icon icon-salary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">平均工资</span>
+          <span class="stat-value" id="statSalary">—</span>
+        </div>
+      </div>
+    </section>
+    <section class="panel glass reveal" style="--d:320ms" aria-label="人员列表">
+      <div class="toolbar">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="search" id="searchInput" aria-label="搜索姓名或工号" placeholder="搜索姓名或工号…" autocomplete="off" />
+        </div>
+        <div class="filters" id="filters" role="group" aria-label="人员类别">
+          <button class="chip active" data-filter="all" type="button" aria-pressed="true">全部</button>
+          <button class="chip" data-filter="teacher" type="button" aria-pressed="false">教师</button>
+          <button class="chip" data-filter="admin" type="button" aria-pressed="false">行政</button>
+        </div>
+        <select id="sortSelect" class="glass-select" aria-label="人员排序">
+          <option value="default">默认排序</option>
+          <option value="age-asc">年龄 ↑</option>
+          <option value="age-desc">年龄 ↓</option>
+          <option value="salary-desc">工资 ↓</option>
+          <option value="salary-asc">工资 ↑</option>
+        </select>
+      </div>
+
+      <div class="table-wrap" tabindex="0" aria-label="人员数据表，可横向滚动">
+        <table class="data-table">
+          <caption class="sr-only">学校人员信息</caption>
+          <thead>
+            <tr>
+              <th scope="col">类别</th><th scope="col">工号</th><th scope="col">姓名</th><th scope="col">性别</th>
+              <th scope="col" class="ta-c">年龄</th><th scope="col">电话</th>
+              <th scope="col">院系 / 部门</th><th scope="col">职称 / 职务</th>
+              <th scope="col" class="ta-r">工资</th><th scope="col" class="ta-c">操作</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState" hidden>
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+          <p class="empty-title" id="emptyTitle">暂无人员数据</p>
+          <p class="empty-sub" id="emptySub">点击右上角「添加人员」开始录入</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="table-summary" id="tableSummary" aria-live="polite"></div>
+    <footer class="footer" id="pageFooter">
+      <span>Aurora Personnel System · 校园人员档案</span>
+    </footer>
+  </main>
+
+  <div class="modal-overlay" id="modalOverlay" hidden>
+    <div class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="formHint" tabindex="-1">
+      <div class="modal-head">
+        <h2 id="modalTitle">添加人员</h2>
+        <button class="icon-btn" id="btnCloseModal" type="button" aria-label="关闭表单">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form id="personForm" class="modal-body" novalidate>
+        <p id="formHint" class="form-hint">标有 * 的项目为必填，保存后写入学校人员档案。</p>
+        <div class="type-switch" id="typeSwitch" role="group" aria-label="人员类别">
+          <button type="button" class="type-btn active" data-type="teacher" aria-pressed="true">教师</button>
+          <button type="button" class="type-btn" data-type="admin" aria-pressed="false">行政人员</button>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>工号 *</span><input id="fieldId" required maxlength="32" pattern="[A-Za-z0-9_-]{1,32}" placeholder="如 T001" aria-describedby="idHint" /><small id="idHint">1–32 位字母、数字、下划线或连字符</small></label>
+          <label class="field"><span>姓名 *</span><input id="fieldName" required maxlength="64" placeholder="如 张三" /></label>
+          <label class="field"><span>性别 *</span>
+            <select id="fieldGender" class="glass-select" required><option>男</option><option>女</option><option>其他</option></select>
+          </label>
+          <label class="field"><span>年龄 *</span><input id="fieldAge" type="number" required min="18" max="100" step="1" placeholder="如 35" /></label>
+          <label class="field span2"><span>联系电话</span><input id="fieldPhone" type="tel" maxlength="32" placeholder="如 13800138000" aria-describedby="phoneHint" /><small id="phoneHint">选填，支持国际区号、括号、空格及连字符</small></label>
+          <label class="field"><span id="labelDept">所属院系 *</span><input id="fieldDept" required maxlength="128" placeholder="如 计算机学院" /></label>
+          <label class="field"><span id="labelRole">职称 *</span><input id="fieldRole" required maxlength="128" placeholder="如 教授" /></label>
+          <label class="field span2"><span>工资（元） *</span><input id="fieldSalary" type="number" required min="0" max="100000000" step="any" placeholder="如 12000.50" /></label>
+        </div>
+        <p id="formError" class="form-error" role="alert" hidden></p>
+      </form>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="btnFormRetry" type="button" hidden>重试连接</button>
+        <button class="btn btn-ghost" id="btnCancel" type="button">取消</button>
+        <button class="btn btn-primary" id="btnSave" type="submit" form="personForm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay thin" id="confirmOverlay" hidden>
+    <div class="modal confirm glass" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText" tabindex="-1">
+      <div class="confirm-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <h3 id="confirmTitle">确认删除</h3>
+      <p id="confirmText">此操作不可撤销,确定要删除吗?</p>
+      <p id="deleteError" class="form-error" role="alert" hidden></p>
+      <button class="btn btn-ghost dialog-retry" id="btnDeleteRetry" type="button" hidden>重试连接</button>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" id="btnConfirmCancel" type="button">取消</button>
+        <button class="btn btn-danger" id="btnConfirmOk" type="button">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="app.js?v=20261011"></script>
+</body>
+</html>

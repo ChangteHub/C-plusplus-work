@@ -2,7 +2,9 @@
 
 本目录提供 Ubuntu 24.04 的 systemd 和 Nginx 配置。C++ 服务监听 `127.0.0.1:18080`，Nginx 通过 HTTPS 提供页面和 API；SQLite 数据库独立保存在 `/var/lib/school-personnel/school.db`。域名模板使用 `swustmarket.xyz`，迁移服务器时需修改域名和证书路径。
 
-2026 年 10 月 11 日已部署到 [https://swustmarket.xyz](https://swustmarket.xyz)，公网验证完成。后端、Nginx 和 `certbot.timer` 均已启用开机启动；证书模拟续期通过，续期后的 Nginx reload 钩子也已运行验证。正式库当前为空，部署验证记录已清理，初始备份位于 `/var/backups/school-personnel/school-20261011-initial.db`。
+2026 年 10 月 11 日首次部署到 [https://swustmarket.xyz](https://swustmarket.xyz)，公网验证完成。后端、Nginx 和 `certbot.timer` 均已启用开机启动；证书模拟续期通过，续期后的 Nginx reload 钩子也已运行验证。首次部署的空数据库备份位于 `/var/backups/school-personnel/school-20261011-initial.db`。
+
+同日已更新为教师、行政人员、学生、普通工作者四类人员版本，当前发布目录是 `/opt/school-personnel/releases/20261011-four-types`。Windows 和 Ubuntu 的 16 组接口测试及控制台测试均通过。更新前后数据库备份分别为 `/var/backups/school-personnel/school-20261011-before-four-types.db` 和 `/var/backups/school-personnel/school-20261011-after-four-types.db`；原有人员记录经逐字段比对保留，公网新增类别的验证记录已删除。网站账号和密码保持原配置。
 
 ## 目录与服务
 
@@ -32,6 +34,7 @@
    cmake --build /opt/school-personnel/releases/<版本>/build-cmake -j1
    cd /opt/school-personnel/releases/<版本>
    python3 tests/test_api.py --server build-cmake/server
+   python3 tests/test_console.py --console build-cmake/school_system
    ```
 
 3. 创建无登录权限的系统用户 `school-personnel`，将 `/var/lib/school-personnel` 的所有权交给该用户。发布目录保持 root 所有，只允许服务读取和执行。
@@ -80,4 +83,6 @@ python3 /opt/school-personnel/current/tools/backup_database.py \
   --output /var/backups/school-personnel/school-$(date +%Y%m%d-%H%M%S).db
 ```
 
-不要仅复制正在运行的 `.db` 文件，也不要删除 `.db-wal`。更新代码时先备份数据库，将新源码放入新的发布目录，编译并通过测试后更新 `current`，再重启服务。数据库和环境配置无需随发布复制。回退程序时，将 `current` 指回原版本并重启；未来涉及数据库结构变更时，还需另行评估数据库兼容性。
+不要仅复制正在运行的 `.db` 文件，也不要删除 `.db-wal`。更新代码时先备份数据库，将新源码放入新的发布目录，编译并通过测试后更新 `current`，再重启服务。数据库和环境配置无需随发布复制。
+
+学生与普通工作者版本会自动扩展现有 `people` 表，保留原来的教师、行政人员记录。更新前需备份正式数据库。旧版程序无法识别 `Student` / `Worker` 记录；添加这两类记录后，不能仅切换回旧程序。若确需回退旧版，需停机恢复更新前的完整 SQLite 备份，并明确这会恢复到备份时的数据状态；应先额外备份当前数据库。

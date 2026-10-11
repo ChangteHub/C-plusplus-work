@@ -8,10 +8,16 @@ const state = {
   returnFocus: null, lastUpdated: null,
 };
 const $ = (id) => document.getElementById(id);
+const TYPES = {
+  teacher: { label: "教师", role: "title", roleLabel: "职称", roleHint: "如 教授", deptHint: "如 计算机学院", idHint: "如 T001" },
+  admin: { label: "行政人员", role: "position", roleLabel: "职务", roleHint: "如 会计", deptHint: "如 财务处", idHint: "如 A001" },
+  student: { label: "学生", role: "major", roleLabel: "专业", roleHint: "如 软件工程", deptHint: "如 计算机学院", idHint: "如 202601001" },
+  worker: { label: "普通工作者", role: "job", roleLabel: "岗位", roleHint: "如 保安、保洁或维修", deptHint: "如 后勤服务中心", idHint: "如 W001" },
+};
 const els = Object.fromEntries([
   "tableBody", "emptyState", "emptyTitle", "emptySub", "tableSummary",
   "searchInput", "sortSelect", "filters", "statTotal", "statTeacher",
-  "statAdmin", "statSalary", "connBadge", "connText", "connectionNotice",
+  "statAdmin", "statStudent", "statWorker", "statSalary", "connBadge", "connText", "connectionNotice",
   "modalOverlay", "modalTitle", "confirmOverlay", "confirmText", "toastStack",
   "personForm", "formError", "deleteError", "btnAdd", "btnRetry", "btnSave",
   "btnCloseModal", "btnCancel", "btnConfirmOk", "btnConfirmCancel",
@@ -47,7 +53,7 @@ async function request(path, options = {}, requireJson = false) {
       const defaults = {
         401: "身份认证失败，请使用服务器配置的账号重新登录",
         403: "没有执行此操作的权限", 404: "人员记录不存在，请刷新列表",
-        409: "工号已存在，请更换", 413: "提交的信息过长",
+        409: "工号或学号已存在，请更换", 413: "提交的信息过长",
         429: "请求过于频繁，请稍后再试",
       };
       throw new ApiError(serverMessage || defaults[response.status] || `服务器请求失败（HTTP ${response.status}）`, response.status);
@@ -107,8 +113,10 @@ function syncControls() {
 
 function validList(data) {
   if (!Array.isArray(data) || data.some((person) => !person || typeof person !== "object" ||
-      !["teacher", "admin"].includes(person.type) || typeof person.id !== "string" ||
-      typeof person.name !== "string" || !Number.isFinite(person.age) || !Number.isFinite(person.salary))) {
+      !Object.hasOwn(TYPES, person.type) || typeof person.id !== "string" ||
+      typeof person.name !== "string" || !Number.isFinite(person.age) ||
+      typeof person.department !== "string" || typeof person[TYPES[person.type].role] !== "string" ||
+      (person.type === "student" ? typeof person.className !== "string" || !Number.isInteger(person.admissionYear) : !Number.isFinite(person.salary)))) {
     throw new ApiError("服务器返回的人员列表格式有误，请重试");
   }
   return data;
@@ -149,11 +157,12 @@ function render() {
   if (state.filter !== "all") list = list.filter((person) => person.type === state.filter);
   if (state.query) {
     const query = state.query.toLocaleLowerCase();
-    list = list.filter((person) => person.name.toLocaleLowerCase().includes(query) || person.id.toLocaleLowerCase().includes(query));
+    list = list.filter((person) => [person.name, person.id, person.department, person[TYPES[person.type].role], person.className]
+      .some((text) => typeof text === "string" && text.toLocaleLowerCase().includes(query)));
   }
   const sorts = {
     "age-asc": (a, b) => a.age - b.age, "age-desc": (a, b) => b.age - a.age,
-    "salary-asc": (a, b) => a.salary - b.salary, "salary-desc": (a, b) => b.salary - a.salary,
+    "salary-asc": (a, b) => salaryOrder(a, b, 1), "salary-desc": (a, b) => salaryOrder(a, b, -1),
   };
   if (sorts[state.sort]) list.sort(sorts[state.sort]);
   state.view = list;
@@ -161,12 +170,20 @@ function render() {
   renderTable();
 }
 
+function salaryOrder(a, b, direction) {
+  if (a.type === "student" || b.type === "student") return Number(a.type === "student") - Number(b.type === "student");
+  return direction * (a.salary - b.salary);
+}
+
 function renderStats() {
   const list = state.people;
   els.statTotal.textContent = state.loaded ? String(list.length) : "—";
   els.statTeacher.textContent = state.loaded ? String(list.filter((person) => person.type === "teacher").length) : "—";
   els.statAdmin.textContent = state.loaded ? String(list.filter((person) => person.type === "admin").length) : "—";
-  els.statSalary.textContent = state.loaded ? formatMoney(list.length ? list.reduce((sum, person) => sum + person.salary, 0) / list.length : 0, true) : "—";
+  els.statStudent.textContent = state.loaded ? String(list.filter((person) => person.type === "student").length) : "—";
+  els.statWorker.textContent = state.loaded ? String(list.filter((person) => person.type === "worker").length) : "—";
+  const employees = list.filter((person) => person.type !== "student");
+  els.statSalary.textContent = state.loaded ? formatMoney(employees.length ? employees.reduce((sum, person) => sum + person.salary, 0) / employees.length : 0, true) : "—";
 }
 
 function cell(text, className = "") {
@@ -198,12 +215,19 @@ function renderTable() {
     const typeCell = document.createElement("td");
     const badge = document.createElement("span");
     badge.className = `badge ${person.type}`;
-    badge.textContent = person.type === "teacher" ? "教师" : "行政";
+    badge.textContent = TYPES[person.type].label;
     typeCell.append(badge);
+    const roleCell = cell(person[TYPES[person.type].role] || "—");
+    if (person.type === "student") {
+      const detail = document.createElement("small");
+      detail.className = "cell-detail";
+      detail.textContent = `${person.className} · ${person.admissionYear} 年入学`;
+      roleCell.append(detail);
+    }
     row.append(typeCell, cell(person.id, "cell-id"), cell(person.name, "cell-name"),
       cell(person.gender), cell(person.age, "ta-c"), cell(person.phone || "—"),
-      cell(person.department || "—"), cell((person.type === "teacher" ? person.title : person.position) || "—"),
-      cell(formatMoney(person.salary), "ta-r"));
+      cell(person.department || "—"), roleCell,
+      cell(person.type === "student" ? "—" : formatMoney(person.salary), "ta-r"));
     const actionsCell = cell("", "ta-c");
     const actions = document.createElement("div");
     actions.className = "row-actions";
@@ -225,7 +249,7 @@ function renderTable() {
     els.emptySub.textContent = "试着更换关键词或人员类别";
   }
   els.tableSummary.textContent = state.loaded
-    ? `显示 ${state.view.length} / ${state.people.length} 人 · 统计涵盖全部人员 · ${state.online ? "更新于" : "上次加载于"} ${state.lastUpdated.toLocaleTimeString("zh-CN", { hour12: false })}`
+    ? `显示 ${state.view.length} / ${state.people.length} 人 · 工资统计仅含教职工 · ${state.online ? "更新于" : "上次加载于"} ${state.lastUpdated.toLocaleTimeString("zh-CN", { hour12: false })}`
     : "人员信息加载完成后将在此显示";
 }
 
@@ -261,8 +285,8 @@ function clearErrors() {
 function openModal(person = null) {
   if (!state.online || state.busy || state.loading) return;
   state.editingId = person ? person.id : null;
-  setType(person ? person.type : "teacher");
   els.personForm.reset();
+  setType(person ? person.type : state.filter === "all" ? "teacher" : state.filter);
   els.modalTitle.textContent = person ? "编辑人员" : "添加人员";
   $("fieldId").value = person ? person.id : "";
   $("fieldName").value = person ? person.name : "";
@@ -270,9 +294,11 @@ function openModal(person = null) {
   $("fieldAge").value = person ? String(person.age) : "";
   $("fieldPhone").value = person ? person.phone || "" : "";
   $("fieldDept").value = person ? person.department || "" : "";
-  $("fieldRole").value = person ? (person.type === "teacher" ? person.title : person.position) || "" : "";
+  $("fieldRole").value = person ? person[TYPES[person.type].role] || "" : "";
+  $("fieldClass").value = person ? person.className || "" : "";
+  $("fieldYear").value = person && person.type === "student" ? String(person.admissionYear) : String(new Date().getFullYear());
   // 直接使用服务器数值，显示金额格式不参与编辑和保存。
-  $("fieldSalary").value = person ? String(person.salary) : "";
+  $("fieldSalary").value = person && person.type !== "student" ? String(person.salary) : "";
   clearErrors();
   activateDialog(els.modalOverlay, $("fieldId"));
 }
@@ -282,17 +308,29 @@ function closeModal(force = false) {
 }
 
 function setType(type) {
-  if (!["teacher", "admin"].includes(type) || state.busy) return;
+  if (!Object.hasOwn(TYPES, type) || state.busy) return;
   state.formType = type;
   for (const button of $("typeSwitch").querySelectorAll("button")) {
     const active = button.dataset.type === type;
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   }
-  $("labelDept").textContent = type === "teacher" ? "所属院系 *" : "所属部门 *";
-  $("labelRole").textContent = type === "teacher" ? "职称 *" : "职务 *";
-  $("fieldDept").placeholder = type === "teacher" ? "如 计算机学院" : "如 财务处";
-  $("fieldRole").placeholder = type === "teacher" ? "如 教授" : "如 会计";
+  const student = type === "student";
+  $("labelId").textContent = student ? "学号 *" : "工号 *";
+  $("labelDept").textContent = student ? "所属学院 *" : type === "teacher" ? "所属院系 *" : "所属部门 *";
+  $("labelRole").textContent = `${TYPES[type].roleLabel} *`;
+  $("fieldId").placeholder = TYPES[type].idHint;
+  $("fieldDept").placeholder = TYPES[type].deptHint;
+  $("fieldRole").placeholder = TYPES[type].roleHint;
+  $("fieldAge").min = student ? "6" : "18";
+  $("fieldAge").placeholder = student ? "如 18" : "如 35";
+  $("studentClassField").hidden = !student;
+  $("studentYearField").hidden = !student;
+  $("salaryField").hidden = student;
+  $("fieldClass").required = student;
+  $("fieldYear").required = student;
+  $("fieldSalary").required = !student;
+  clearErrors();
 }
 
 function invalid(field, message) {
@@ -312,19 +350,25 @@ function readForm() {
   const department = value("fieldDept"), role = value("fieldRole"), phone = value("fieldPhone");
   const ageText = value("fieldAge"), salaryText = value("fieldSalary");
   const age = Number(ageText), salary = Number(salaryText);
-  if (!/^[A-Za-z0-9_-]{1,32}$/.test(id)) return invalid("fieldId", "工号须为 1–32 位字母、数字、下划线或连字符");
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(id)) return invalid("fieldId", "工号或学号须为 1–32 位字母、数字、下划线或连字符");
   if (!name || [...name].length > 64) return invalid("fieldName", "请输入姓名，最多 64 个字符");
   if (!["男", "女", "其他"].includes(gender)) return invalid("fieldGender", "请选择有效的性别");
-  if (!ageText || !Number.isInteger(age) || age < 18 || age > 100) return invalid("fieldAge", "年龄须为 18–100 的整数");
+  const student = state.formType === "student";
+  const minimumAge = student ? 6 : 18;
+  if (!ageText || !Number.isInteger(age) || age < minimumAge || age > 100) return invalid("fieldAge", `年龄须为 ${minimumAge}–100 的整数`);
   if (!validPhone(phone)) return invalid("fieldPhone", "联系电话须包含 6–20 位数字，最多 32 个字符；可使用开头的 +、配对括号、空格、连字符或小数点");
   if (!department || [...department].length > 128) return invalid("fieldDept", "请输入院系或部门，最多 128 个字符");
-  if (!role || [...role].length > 128) return invalid("fieldRole", "请输入职称或职务，最多 128 个字符");
+  if (!role || [...role].length > 128) return invalid("fieldRole", `请输入${TYPES[state.formType].roleLabel}，最多 128 个字符`);
+  if (state.people.some((person) => person.id === id && person.id !== state.editingId)) return invalid("fieldId", "工号或学号已存在，请更换");
+  const person = { type: state.formType, id, name, gender, age, phone, department, [TYPES[state.formType].role]: role };
+  if (student) {
+    const className = value("fieldClass"), yearText = value("fieldYear"), admissionYear = Number(yearText);
+    if (!className || [...className].length > 128) return invalid("fieldClass", "请输入班级，最多 128 个字符");
+    if (!yearText || !Number.isInteger(admissionYear) || admissionYear < 1900 || admissionYear > 2100) return invalid("fieldYear", "入学年份须为 1900–2100 的整数");
+    return { ...person, className, admissionYear };
+  }
   if (!salaryText || !Number.isFinite(salary) || salary < 0 || salary > 100000000) return invalid("fieldSalary", "工资须为 0–100,000,000 元之间的有效数字");
-  if (state.people.some((person) => person.id === id && person.id !== state.editingId)) return invalid("fieldId", "工号已存在，请更换");
-  return {
-    type: state.formType, id, name, gender, age, phone, department, salary,
-    [state.formType === "teacher" ? "title" : "position"]: role,
-  };
+  return { ...person, salary };
 }
 
 function validPhone(phone) {

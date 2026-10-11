@@ -1,8 +1,11 @@
 #include "dao.h"
 #include "teacher.h"
 #include "adminstaff.h"
+#include "student.h"
+#include "worker.h"
 #include <sqlite3.h>
 #include <memory>
+#include <set>
 
 using namespace std;
 
@@ -79,27 +82,72 @@ Person* rowToPerson(sqlite3_stmt* stmt) {
     if (type == "Admin")
         return new AdminStaff(id, name, gender, age, phone, department,
                               colText(stmt, 8), salary);
+    if (type == "Student")
+        return new Student(id, name, gender, age, phone, department,
+                           colText(stmt, 10), colText(stmt, 11), sqlite3_column_int(stmt, 12));
+    if (type == "Worker")
+        return new Worker(id, name, gender, age, phone, department, colText(stmt, 13), salary);
     throw runtime_error("SQLite contains an unsupported personnel type");
 }
 
 const char* SELECT_COLS =
-    "SELECT type,id,name,gender,age,phone,department,title,position,salary FROM people";
+    "SELECT type,id,name,gender,age,phone,department,title,position,salary,"
+    "major,class_name,admission_year,job FROM people";
+
+void migrateSchema(sqlite3* handle) {
+    // 先核对旧字段，再在事务内补充新字段；原有记录和主键不变。
+    {
+        Statement originalSchema(handle,
+            "SELECT type,id,name,gender,age,phone,department,title,position,salary FROM people");
+    }
+    execute(handle, "BEGIN IMMEDIATE");
+    try {
+        set<string> columns;
+        {
+            Statement info(handle, "PRAGMA table_info(people)");
+            int status;
+            while ((status = sqlite3_step(info.get())) == SQLITE_ROW)
+                columns.insert(colText(info.get(), 1));
+            if (status != SQLITE_DONE) throw storageError(handle, "schema read failed");
+        }
+        if (!columns.count("major"))
+            execute(handle, "ALTER TABLE people ADD COLUMN major TEXT NOT NULL DEFAULT ''");
+        if (!columns.count("class_name"))
+            execute(handle, "ALTER TABLE people ADD COLUMN class_name TEXT NOT NULL DEFAULT ''");
+        if (!columns.count("admission_year"))
+            execute(handle, "ALTER TABLE people ADD COLUMN admission_year INTEGER NOT NULL DEFAULT 0");
+        if (!columns.count("job"))
+            execute(handle, "ALTER TABLE people ADD COLUMN job TEXT NOT NULL DEFAULT ''");
+        Statement schemaCheck(handle, SELECT_COLS);
+        execute(handle, "COMMIT");
+    } catch (...) {
+        sqlite3_exec(handle, "ROLLBACK", NULL, NULL, NULL);
+        throw;
+    }
+}
 
 void bindPerson(Statement& stmt, Person* person) {
     if (!person) throw invalid_argument("Cannot persist a null person");
     const Teacher* teacher = dynamic_cast<const Teacher*>(person);
     const AdminStaff* admin = dynamic_cast<const AdminStaff*>(person);
-    if (!teacher && !admin) throw invalid_argument("Unsupported personnel type");
-    stmt.text(1, teacher ? "Teacher" : "Admin");
+    const Student* student = dynamic_cast<const Student*>(person);
+    const Worker* worker = dynamic_cast<const Worker*>(person);
+    if (!teacher && !admin && !student && !worker) throw invalid_argument("Unsupported personnel type");
+    stmt.text(1, teacher ? "Teacher" : admin ? "Admin" : student ? "Student" : "Worker");
     stmt.text(2, person->getId());
     stmt.text(3, person->getName());
     stmt.text(4, person->getGender());
     stmt.integer(5, person->getAge());
     stmt.text(6, person->getPhone());
-    stmt.text(7, teacher ? teacher->getDepartment() : admin->getDepartment());
+    stmt.text(7, teacher ? teacher->getDepartment() : admin ? admin->getDepartment() :
+                 student ? student->getDepartment() : worker->getDepartment());
     stmt.text(8, teacher ? teacher->getTitle() : "");
     stmt.text(9, admin ? admin->getPosition() : "");
     stmt.real(10, person->getSalary());
+    stmt.text(11, student ? student->getMajor() : "");
+    stmt.text(12, student ? student->getClassName() : "");
+    stmt.integer(13, student ? student->getAdmissionYear() : 0);
+    stmt.text(14, worker ? worker->getJob() : "");
 }
 
 void checkWrite(sqlite3* handle, int result) {
@@ -137,7 +185,7 @@ bool Dao::open(const string& path) {
             "type TEXT NOT NULL,id TEXT PRIMARY KEY,name TEXT,gender TEXT,"
             "age INTEGER,phone TEXT,department TEXT,title TEXT,position TEXT,salary REAL);");
         // 提前验证已有数据库的列兼容性，防止服务启动后才发现损坏/旧表问题。
-        Statement schemaCheck(handle, SELECT_COLS);
+        migrateSchema(handle);
     } catch (...) {
         sqlite3_close_v2(handle);
         throw;
@@ -206,8 +254,9 @@ bool Dao::insert(Person* person) {
     lock_guard<mutex> lock(dbMutex);
     sqlite3* handle = requireOpen(db, opened);
     Statement stmt(handle,
-        "INSERT INTO people(type,id,name,gender,age,phone,department,title,position,salary) "
-        "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)");
+        "INSERT INTO people(type,id,name,gender,age,phone,department,title,position,salary,"
+        "major,class_name,admission_year,job) "
+        "VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)");
     bindPerson(stmt, person);
     checkWrite(handle, sqlite3_step(stmt.get()));
     return true;
@@ -218,9 +267,10 @@ bool Dao::update(const string& originalId, Person* person) {
     sqlite3* handle = requireOpen(db, opened);
     Statement stmt(handle,
         "UPDATE people SET type=?1,id=?2,name=?3,gender=?4,age=?5,phone=?6,"
-        "department=?7,title=?8,position=?9,salary=?10 WHERE id=?11");
+        "department=?7,title=?8,position=?9,salary=?10,major=?11,class_name=?12,"
+        "admission_year=?13,job=?14 WHERE id=?15");
     bindPerson(stmt, person);
-    stmt.text(11, originalId);
+    stmt.text(15, originalId);
     checkWrite(handle, sqlite3_step(stmt.get()));
     return sqlite3_changes(handle) > 0;
 }

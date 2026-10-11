@@ -158,7 +158,7 @@ body {
 .connection-notice.notice-error { border-color: rgba(255, 125, 107, 0.4); background: rgba(255, 125, 107, 0.08); color: #ffd0c9; }
 
 /* ---------- 统计卡片 ---------- */
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 22px; }
+.stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
 .stat-card {
   display: flex; align-items: center; gap: 16px;
   padding: 20px;
@@ -176,6 +176,8 @@ body {
 .icon-total { background: rgba(74, 168, 255, 0.16); color: var(--azure); }
 .icon-teacher { background: rgba(52, 224, 200, 0.16); color: var(--mint); }
 .icon-admin { background: rgba(167, 139, 250, 0.16); color: var(--violet); }
+.icon-student { background: rgba(74, 168, 255, 0.16); color: var(--azure); }
+.icon-worker { background: rgba(255, 125, 107, 0.16); color: var(--coral); }
 .icon-salary { background: rgba(255, 199, 107, 0.16); color: var(--amber); }
 .stat-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .stat-label { font-size: 0.8rem; color: var(--text-2); font-weight: 400; }
@@ -325,6 +327,9 @@ body {
 .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge.teacher { color: var(--mint); background: rgba(52, 224, 200, 0.12); border-color: rgba(52, 224, 200, 0.3); }
 .badge.admin { color: var(--violet); background: rgba(167, 139, 250, 0.12); border-color: rgba(167, 139, 250, 0.3); }
+.badge.student { color: var(--azure); background: rgba(74, 168, 255, 0.12); border-color: rgba(74, 168, 255, 0.3); }
+.badge.worker { color: var(--coral); background: rgba(255, 125, 107, 0.12); border-color: rgba(255, 125, 107, 0.3); }
+.cell-detail { display: block; margin-top: 4px; color: var(--text-2); font-size: 0.75rem; }
 
 /* 行内操作 */
 .row-actions { display: inline-flex; gap: 6px; }
@@ -394,7 +399,7 @@ body.dialog-open { overflow: hidden; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px 22px; }
 
 /* 类型切换 */
-.type-switch { display: flex; gap: 6px; padding: 4px; margin-bottom: 18px; border-radius: 13px; background: rgba(0, 0, 0, 0.22); border: 1px solid var(--glass-border); }
+.type-switch { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 4px; margin-bottom: 18px; border-radius: 13px; background: rgba(0, 0, 0, 0.22); border: 1px solid var(--glass-border); }
 .type-btn {
   flex: 1; font-family: inherit; font-size: 0.88rem; font-weight: 500;
   color: var(--text-2); padding: 9px; border: none; border-radius: 10px;
@@ -483,7 +488,8 @@ body.dialog-open { overflow: hidden; }
   .modal-foot { padding: 14px 18px 18px; }
   .toolbar { gap: 10px; }
   .search-box { min-width: 100%; }
-  .filters { width: 100%; }
+  .filters { width: 100%; flex-wrap: wrap; }
+  .type-switch { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .chip { flex: 1; }
   #sortSelect { width: 100%; }
   .toast-stack { right: 12px; left: 12px; bottom: 16px; }

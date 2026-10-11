@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Aurora · 学校人员信息管理系统</title>
-  <meta name="description" content="学校教师与行政人员的查询、录入和管理" />
+  <meta name="description" content="学校教师、行政人员、学生与普通工作者的查询、录入和管理" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20261011" />
+  <link rel="stylesheet" href="styles.css?v=20261011-4types" />
 </head>
 <body>
   <div class="aurora-bg" aria-hidden="true">
@@ -44,7 +44,7 @@
 
   <main class="container" id="pageMain">
     <div class="page-intro">
-      <div><span class="eyebrow">CAMPUS DIRECTORY</span><h1>人员管理</h1><p>统一管理学校教师与行政人员信息</p></div>
+      <div><span class="eyebrow">CAMPUS DIRECTORY</span><h1>人员管理</h1><p>统一管理教师、行政人员、学生与普通工作者档案</p></div>
       <button id="btnRetry" class="btn btn-ghost" type="button">刷新列表</button>
     </div>
     <div id="connectionNotice" class="connection-notice" role="status" aria-live="polite">正在连接服务器，加载人员信息…</div>
@@ -77,11 +77,19 @@
         </div>
       </div>
       <div class="stat-card glass reveal" style="--d:240ms">
+        <div class="stat-icon icon-student"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 9 10-5 10 5-10 5-10-5zM6 11v6c3 3 9 3 12 0v-6M22 9v6"/></svg></div>
+        <div class="stat-body"><span class="stat-label">学生</span><span class="stat-value" id="statStudent">—</span></div>
+      </div>
+      <div class="stat-card glass reveal" style="--d:280ms">
+        <div class="stat-icon icon-worker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18M10 12v3h4v-3"/></svg></div>
+        <div class="stat-body"><span class="stat-label">普通工作者</span><span class="stat-value" id="statWorker">—</span></div>
+      </div>
+      <div class="stat-card glass reveal" style="--d:320ms">
         <div class="stat-icon icon-salary">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         </div>
         <div class="stat-body">
-          <span class="stat-label">平均工资</span>
+          <span class="stat-label">教职工平均工资</span>
           <span class="stat-value" id="statSalary">—</span>
         </div>
       </div>
@@ -90,12 +98,14 @@
       <div class="toolbar">
         <div class="search-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="search" id="searchInput" aria-label="搜索姓名或工号" placeholder="搜索姓名或工号…" autocomplete="off" />
+          <input type="search" id="searchInput" aria-label="搜索姓名、工号、学号、专业或班级" placeholder="搜索姓名、编号、专业或班级…" autocomplete="off" />
         </div>
         <div class="filters" id="filters" role="group" aria-label="人员类别">
           <button class="chip active" data-filter="all" type="button" aria-pressed="true">全部</button>
           <button class="chip" data-filter="teacher" type="button" aria-pressed="false">教师</button>
           <button class="chip" data-filter="admin" type="button" aria-pressed="false">行政</button>
+          <button class="chip" data-filter="student" type="button" aria-pressed="false">学生</button>
+          <button class="chip" data-filter="worker" type="button" aria-pressed="false">普通工作者</button>
         </div>
         <select id="sortSelect" class="glass-select" aria-label="人员排序">
           <option value="default">默认排序</option>
@@ -111,9 +121,9 @@
           <caption class="sr-only">学校人员信息</caption>
           <thead>
             <tr>
-              <th scope="col">类别</th><th scope="col">工号</th><th scope="col">姓名</th><th scope="col">性别</th>
+              <th scope="col">类别</th><th scope="col">工号 / 学号</th><th scope="col">姓名</th><th scope="col">性别</th>
               <th scope="col" class="ta-c">年龄</th><th scope="col">电话</th>
-              <th scope="col">院系 / 部门</th><th scope="col">职称 / 职务</th>
+              <th scope="col">院系 / 部门</th><th scope="col">职称 / 岗位 / 专业</th>
               <th scope="col" class="ta-r">工资</th><th scope="col" class="ta-c">操作</th>
             </tr>
           </thead>
@@ -148,9 +158,11 @@
         <div class="type-switch" id="typeSwitch" role="group" aria-label="人员类别">
           <button type="button" class="type-btn active" data-type="teacher" aria-pressed="true">教师</button>
           <button type="button" class="type-btn" data-type="admin" aria-pressed="false">行政人员</button>
+          <button type="button" class="type-btn" data-type="student" aria-pressed="false">学生</button>
+          <button type="button" class="type-btn" data-type="worker" aria-pressed="false">普通工作者</button>
         </div>
         <div class="form-grid">
-          <label class="field"><span>工号 *</span><input id="fieldId" required maxlength="32" pattern="[A-Za-z0-9_-]{1,32}" placeholder="如 T001" aria-describedby="idHint" /><small id="idHint">1–32 位字母、数字、下划线或连字符</small></label>
+          <label class="field"><span id="labelId">工号 *</span><input id="fieldId" required maxlength="32" pattern="[A-Za-z0-9_-]{1,32}" placeholder="如 T001" aria-describedby="idHint" /><small id="idHint">1–32 位字母、数字、下划线或连字符；全校唯一</small></label>
           <label class="field"><span>姓名 *</span><input id="fieldName" required maxlength="64" placeholder="如 张三" /></label>
           <label class="field"><span>性别 *</span>
             <select id="fieldGender" class="glass-select" required><option>男</option><option>女</option><option>其他</option></select>
@@ -159,7 +171,9 @@
           <label class="field span2"><span>联系电话</span><input id="fieldPhone" type="tel" maxlength="32" placeholder="如 13800138000" aria-describedby="phoneHint" /><small id="phoneHint">选填，支持国际区号、括号、空格及连字符</small></label>
           <label class="field"><span id="labelDept">所属院系 *</span><input id="fieldDept" required maxlength="128" placeholder="如 计算机学院" /></label>
           <label class="field"><span id="labelRole">职称 *</span><input id="fieldRole" required maxlength="128" placeholder="如 教授" /></label>
-          <label class="field span2"><span>工资（元） *</span><input id="fieldSalary" type="number" required min="0" max="100000000" step="any" placeholder="如 12000.50" /></label>
+          <label class="field" id="studentClassField" hidden><span>班级 *</span><input id="fieldClass" maxlength="128" placeholder="如 软件工程 2026 级 1 班" /></label>
+          <label class="field" id="studentYearField" hidden><span>入学年份 *</span><input id="fieldYear" type="number" min="1900" max="2100" step="1" placeholder="如 2026" /></label>
+          <label class="field span2" id="salaryField"><span>工资（元） *</span><input id="fieldSalary" type="number" required min="0" max="100000000" step="any" placeholder="如 12000.50" /></label>
         </div>
         <p id="formError" class="form-error" role="alert" hidden></p>
       </form>
@@ -189,6 +203,6 @@
 
   <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="app.js?v=20261011"></script>
+  <script src="app.js?v=20261011-4types"></script>
 </body>
 </html>

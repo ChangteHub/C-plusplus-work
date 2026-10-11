@@ -1,6 +1,8 @@
 #include "personmanager.h"
 #include "teacher.h"
 #include "adminstaff.h"
+#include "student.h"
+#include "worker.h"
 #include "utils.h"
 #include <algorithm>
 #include <fstream>
@@ -32,6 +34,8 @@ void PersonManager::addPerson() {
     cout << "\n===== 添加人员 =====\n";
     cout << "1. 教师\n";
     cout << "2. 行政人员\n";
+    cout << "3. 学生\n";
+    cout << "4. 普通工作者\n";
     cout << "0. 返回\n";
     int choice = readInt("请选择类别: ");
 
@@ -44,6 +48,12 @@ void PersonManager::addPerson() {
         AdminStaff* a = new AdminStaff();
         a->input();
         p = a;
+    } else if (choice == 3) {
+        p = new Student();
+        p->input();
+    } else if (choice == 4) {
+        p = new Worker();
+        p->input();
     } else if (choice == 0) {
         return;
     } else {
@@ -53,7 +63,7 @@ void PersonManager::addPerson() {
 
     // 检查工号是否重复
     if (findIndexById(p->getId()) != -1) {
-        cout << "工号已存在，添加失败！\n";
+        cout << "工号或学号已存在，添加失败！\n";
         delete p;
         return;
     }
@@ -70,12 +80,12 @@ void PersonManager::deletePerson() {
         return;
     }
     string id;
-    cout << "请输入要删除的工号: ";
+    cout << "请输入要删除的工号或学号: ";
     cin >> id;
 
     int idx = findIndexById(id);
     if (idx == -1) {
-        cout << "未找到该工号对应的人员！\n";
+        cout << "未找到该编号对应的人员！\n";
         return;
     }
 
@@ -101,12 +111,12 @@ void PersonManager::modifyPerson() {
         return;
     }
     string id;
-    cout << "请输入要修改的工号: ";
+    cout << "请输入要修改的工号或学号: ";
     cin >> id;
 
     int idx = findIndexById(id);
     if (idx == -1) {
-        cout << "未找到该工号对应的人员！\n";
+        cout << "未找到该编号对应的人员！\n";
         return;
     }
 
@@ -120,6 +130,12 @@ void PersonManager::modifyPerson() {
         Teacher* t = new Teacher();
         t->input();
         p = t;
+    } else if (type == "学生") {
+        p = new Student();
+        p->input();
+    } else if (type == "普通工作者") {
+        p = new Worker();
+        p->input();
     } else {
         AdminStaff* a = new AdminStaff();
         a->input();
@@ -127,7 +143,7 @@ void PersonManager::modifyPerson() {
     }
 
     if (p->getId() != id && findIndexById(p->getId()) != -1) {
-        cout << "该工号已被其他人使用，修改失败！\n";
+        cout << "该工号或学号已被其他人使用，修改失败！\n";
         delete p;
         return;
     }
@@ -145,7 +161,7 @@ void PersonManager::searchPerson() const {
         cout << "当前没有任何人员记录！\n";
         return;
     }
-    cout << "1. 按工号查询\n";
+    cout << "1. 按工号或学号查询\n";
     cout << "2. 按姓名查询\n";
     cout << "3. 按类别查询\n";
     cout << "0. 返回\n";
@@ -153,7 +169,7 @@ void PersonManager::searchPerson() const {
 
     if (choice == 1) {
         string id;
-        cout << "请输入工号: ";
+        cout << "请输入工号或学号: ";
         cin >> id;
         int idx = findIndexById(id);
         if (idx == -1) {
@@ -174,9 +190,10 @@ void PersonManager::searchPerson() const {
         }
         if (!found) cout << "未找到该姓名的人员！\n";
     } else if (choice == 3) {
-        cout << "1. 教师\n2. 行政人员\n";
+        cout << "1. 教师\n2. 行政人员\n3. 学生\n4. 普通工作者\n";
         int t = readInt("请选择类别: ");
-        string type = (t == 1) ? "教师" : "行政人员";
+        if (t < 1 || t > 4) { cout << "无效选择！\n"; return; }
+        string type = t == 1 ? "教师" : t == 2 ? "行政人员" : t == 3 ? "学生" : "普通工作者";
         bool found = false;
         for (size_t i = 0; i < people.size(); ++i) {
             if (people[i]->getType() == type) {
@@ -195,13 +212,13 @@ void PersonManager::searchPerson() const {
 // 打印表头
 static void printHeader() {
     cout << left << setw(16) << "类别"
-         << setw(12) << "工号"
+         << setw(12) << "工号/学号"
          << setw(12) << "姓名"
          << setw(8) << "性别"
          << setw(6) << "年龄"
          << setw(16) << "电话"
          << setw(18) << "院系/部门"
-         << setw(12) << "职称/职务"
+         << setw(12) << "职称/岗位/专业"
          << setw(12) << "工资" << "\n";
     cout << string(112, '-') << "\n";
 }
@@ -225,13 +242,15 @@ void PersonManager::displayAll() const {
 void PersonManager::statistics() const {
     cout << "\n===== 统计信息 =====\n";
     int total = (int)people.size();
-    int teacherCount = 0, adminCount = 0;
+    int teacherCount = 0, adminCount = 0, studentCount = 0, workerCount = 0;
     double totalSalary = 0;
     int ageSum = 0;
 
     for (size_t i = 0; i < people.size(); ++i) {
         if (people[i]->getType() == "教师") teacherCount++;
-        else adminCount++;
+        else if (people[i]->getType() == "行政人员") adminCount++;
+        else if (people[i]->getType() == "学生") studentCount++;
+        else if (people[i]->getType() == "普通工作者") workerCount++;
         totalSalary += people[i]->getSalary();
         ageSum += people[i]->getAge();
     }
@@ -239,14 +258,17 @@ void PersonManager::statistics() const {
     cout << "总人数: " << total << "\n";
     cout << "教师人数: " << teacherCount << "\n";
     cout << "行政人员数: " << adminCount << "\n";
+    cout << "学生人数: " << studentCount << "\n";
+    cout << "普通工作者人数: " << workerCount << "\n";
     cout << fixed << setprecision(2);
-    cout << "工资总额: " << totalSalary << "\n";
+    cout << "教职工工资总额: " << totalSalary << "\n";
     if (total > 0) {
         cout << "平均年龄: " << fixed << setprecision(1)
              << (double)ageSum / total << "\n";
-        cout << "平均工资: " << fixed << setprecision(2)
-             << totalSalary / total << "\n";
     }
+    const int employees = teacherCount + adminCount + workerCount;
+    cout << "教职工平均工资: " << fixed << setprecision(2)
+         << (employees ? totalSalary / employees : 0) << "\n";
 }
 
 // 按年龄排序(升序)
@@ -275,7 +297,11 @@ void PersonManager::sortBySalary() const {
     }
     vector<Person*> tmp = people;
     std::sort(tmp.begin(), tmp.end(),
-              [](Person* a, Person* b) { return a->getSalary() > b->getSalary(); });
+              [](Person* a, Person* b) {
+                  if (a->getType() == "学生" || b->getType() == "学生")
+                      return a->getType() != "学生" && b->getType() == "学生";
+                  return a->getSalary() > b->getSalary();
+              });
     printHeader();
     for (size_t i = 0; i < tmp.size(); ++i) {
         tmp[i]->displayRow();
@@ -333,6 +359,12 @@ Person* PersonManager::createPersonFromLine(const string& line) const {
     } else if (f[0] == "Admin" && f.size() >= 9) {
         return new AdminStaff(f[1], f[2], f[3], atoi(f[4].c_str()),
                               f[5], f[6], f[7], atof(f[8].c_str()));
+    } else if (f[0] == "Student" && f.size() >= 10) {
+        return new Student(f[1], f[2], f[3], atoi(f[4].c_str()), f[5], f[6],
+                           f[7], f[8], atoi(f[9].c_str()));
+    } else if (f[0] == "Worker" && f.size() >= 9) {
+        return new Worker(f[1], f[2], f[3], atoi(f[4].c_str()),
+                          f[5], f[6], f[7], atof(f[8].c_str()));
     }
     return NULL;
 }

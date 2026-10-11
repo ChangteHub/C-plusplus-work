@@ -8,6 +8,7 @@ data is never opened. The server executable must have been built beforehand.
 import argparse
 import base64
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 import http.client
 import json
 import os
@@ -53,6 +54,106 @@ def payload(identifier="T001", kind="teacher"):
         "副教授" if kind == "teacher" else "办公室主任"
     )
     return person
+
+
+def student_payload(identifier="S001"):
+    return {"type": "student", "id": identifier, "name": "学生张小明", "gender": "男",
+            "age": 17, "phone": "", "department": "计算机学院", "major": "软件工程",
+            "className": "软件工程2026级1班", "admissionYear": 2026}
+
+
+def worker_payload(identifier="W001"):
+    person = payload(identifier)
+    person.pop("title")
+    person.update(type="worker", name="王师傅", department="后勤服务中心", job="维修", salary=4200.55)
+    return person
+
+
+def test_students_workers(server):
+    student, worker = student_payload(), worker_payload()
+    for person in (student, worker):
+        server.expect("POST", "/api/people", 201, data=person)
+    people, _ = server.expect("GET", "/api/people", 200)
+    stored = {p["id"]: p for p in people}
+    equal(stored[student["id"]], student, "student fields roundtrip without a salary")
+    equal(stored[worker["id"]], worker, "worker job and salary roundtrip")
+    server.expect("POST", "/api/people", 409, data=worker_payload("S001"))
+    student.update(id="S002", className="软件工程2026级2班", admissionYear=2025)
+    server.expect("PUT", "/api/people/S001", 200, data=student)
+    worker.update(job="保安", salary=4500.67)
+    server.expect("PUT", "/api/people/W001", 200, data=worker)
+    # Switch across old and new categories; stale role and salary fields must disappear.
+    server.expect("POST", "/api/people", 201, data=payload("SWITCH"))
+    switched_student = student_payload("SWITCH")
+    server.expect("PUT", "/api/people/SWITCH", 200, data=switched_student)
+    people, _ = server.expect("GET", "/api/people", 200)
+    equal(next(p for p in people if p["id"] == "SWITCH"), switched_student, "teacher to student")
+    with closing(sqlite3.connect(server.database)) as connection, connection:
+        equal(connection.execute("SELECT title,position,salary,job FROM people WHERE id='SWITCH'").fetchone(),
+              ("", "", 0, ""), "student clears employment-only columns")
+    switched_worker = worker_payload("SWITCH")
+    server.expect("PUT", "/api/people/SWITCH", 200, data=switched_worker)
+    people, _ = server.expect("GET", "/api/people", 200)
+    equal(next(p for p in people if p["id"] == "SWITCH"), switched_worker, "student to worker")
+    with closing(sqlite3.connect(server.database)) as connection, connection:
+        equal(connection.execute("SELECT major,class_name,admission_year FROM people WHERE id='SWITCH'").fetchone(),
+              ("", "", 0), "worker clears study-only columns")
+    server.expect("DELETE", "/api/people/W001", 200)
+    server.expect("POST", "/api/people", 201, data=student_payload("DELETE_STUDENT"))
+    server.expect("DELETE", "/api/people/DELETE_STUDENT", 200)
+    people, _ = server.expect("GET", "/api/people", 200)
+    equal(next(p for p in people if p["id"] == "S002"), student, "student edit and ID rename persist")
+    require(not any(p["id"] in ("W001", "DELETE_STUDENT") for p in people), "deleted new categories remain absent")
+
+
+def test_student_worker_validation(server):
+    before, _ = server.expect("GET", "/api/people", 200)
+    fields = {"major": ("", "　", None, "专" * 129), "className": ("", None, "班" * 129),
+              "admissionYear": (None, "2026", True, 1899, 2101, 2026.5, 10 ** 80),
+              "age": (5, 101, True, "17"), "salary": (1, -1, None, "0")}
+    for field, values in fields.items():
+        for value in values:
+            server.expect("POST", "/api/people", 400, data=dict(student_payload("INVALID_STUDENT"), **{field: value}))
+    for field in ("major", "className", "admissionYear"):
+        candidate = student_payload("INVALID_STUDENT")
+        del candidate[field]
+        server.expect("POST", "/api/people", 400, data=candidate)
+    for changes in ({"job": ""}, {"job": None}, {"job": "岗" * 129}, {"age": 17}, {"salary": -1}):
+        server.expect("POST", "/api/people", 400, data=dict(worker_payload("INVALID_WORKER"), **changes))
+    missing_job = worker_payload("INVALID_WORKER")
+    del missing_job["job"]
+    server.expect("POST", "/api/people", 400, data=missing_job)
+    after, _ = server.expect("GET", "/api/people", 200)
+    equal(after, before, "invalid student/worker writes preserve all records")
+    for age, year in ((6, 1900), (100, 2100)):
+        edge = dict(student_payload("STUDENT_EDGE"), age=age, admissionYear=year)
+        server.expect("POST", "/api/people", 201, data=edge)
+        server.expect("DELETE", "/api/people/STUDENT_EDGE", 200)
+
+
+def test_legacy_migration(executable, directory):
+    server = Server(executable, directory)
+    legacy = [payload("OLD_TEACHER"), payload("OLD_ADMIN", "admin")]
+    with closing(sqlite3.connect(server.database)) as connection, connection:
+        connection.execute("CREATE TABLE people (type TEXT NOT NULL,id TEXT PRIMARY KEY,name TEXT,gender TEXT,"
+                           "age INTEGER,phone TEXT,department TEXT,title TEXT,position TEXT,salary REAL)")
+        for p in legacy:
+            connection.execute("INSERT INTO people VALUES (?,?,?,?,?,?,?,?,?,?)",
+                               ("Teacher" if p["type"] == "teacher" else "Admin", p["id"], p["name"], p["gender"],
+                                p["age"], p["phone"], p["department"], p.get("title", ""), p.get("position", ""), p["salary"]))
+    with server:
+        people, _ = server.expect("GET", "/api/people", 200)
+        equal({p["id"]: p for p in people}, {p["id"]: p for p in legacy}, "migration preserves original personnel")
+        server.expect("POST", "/api/people", 201, data=student_payload("MIGRATED_STUDENT"))
+        server.expect("POST", "/api/people", 201, data=worker_payload("MIGRATED_WORKER"))
+        with closing(sqlite3.connect(server.database)) as connection, connection:
+            columns = [row[1] for row in connection.execute("PRAGMA table_info(people)")]
+            require(all(columns.count(col) == 1 for col in ("major", "class_name", "admission_year", "job")),
+                    "new columns must exist exactly once")
+        expected, _ = server.expect("GET", "/api/people", 200)
+    with Server(executable, directory) as restarted:
+        actual, _ = restarted.expect("GET", "/api/people", 200)
+        equal(actual, expected, "migration is idempotent across restart and preserves all four categories")
 
 
 class Server:
@@ -199,7 +300,7 @@ def test_invalid_requests(server):
     before, _ = server.expect("GET", "/api/people", 200)
     valid = payload("INVALID_ROW")
     invalid_fields = {
-        "type": ("student", None, 1, True),
+        "type": ("unknown", None, 1, True),
         "age": ("35", None, True, 17, 101, -1, 35.5, 10 ** 80),
         "salary": ("12000", None, True, -0.01, 100000001, 10 ** 80),
         "id": ("", "bad/id", "A" * 33, None),
@@ -382,6 +483,8 @@ def main():
         with Server(executable, primary) as server:
             group("health and static files", lambda: test_health_static(server))
             group("teacher/admin CRUD, conflicts, rename and type switch", lambda: test_crud(server))
+            group("student/worker CRUD, unique IDs and category switches", lambda: test_students_workers(server))
+            group("student/worker validation and age/year boundaries", lambda: test_student_worker_validation(server))
             group("invalid JSON and field validation", lambda: test_invalid_requests(server))
             group("oversized request returns 413 without disrupting health", lambda: test_payload_limit(server))
             group("Unicode escapes and salary cents", lambda: test_unicode_money(server))
@@ -398,7 +501,8 @@ def main():
         group("database lock returns 503 and recovers", lambda: test_lock_recovery(executable, root / "locked"))
         group("broken schema returns health/list 503", lambda: test_schema_failure(executable, root / "broken-schema"))
         group("invalid stored UTF-8 returns 503 and recovers after repair", lambda: test_invalid_stored_utf8(executable, root / "invalid-utf8"))
-    print("All 13 groups passed. Only temporary test databases were used.")
+        group("legacy schema migration preserves data and is idempotent", lambda: test_legacy_migration(executable, root / "legacy"))
+    print("All 16 groups passed. Only temporary test databases were used.")
 
 
 if __name__ == "__main__":

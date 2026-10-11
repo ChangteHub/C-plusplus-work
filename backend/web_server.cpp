@@ -5,6 +5,8 @@
 #include "service.h"
 #include "teacher.h"
 #include "adminstaff.h"
+#include "student.h"
+#include "worker.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -35,6 +37,17 @@ static json personJson(const Person& person) {
         out["type"] = "admin";
         out["department"] = admin->getDepartment();
         out["position"] = admin->getPosition();
+    } else if (const auto* student = dynamic_cast<const Student*>(&person)) {
+        out["type"] = "student";
+        out["department"] = student->getDepartment();
+        out["major"] = student->getMajor();
+        out["className"] = student->getClassName();
+        out["admissionYear"] = student->getAdmissionYear();
+        out.erase("salary");
+    } else if (const auto* worker = dynamic_cast<const Worker*>(&person)) {
+        out["type"] = "worker";
+        out["department"] = worker->getDepartment();
+        out["job"] = worker->getJob();
     } else throw std::runtime_error("Unsupported personnel type in storage");
     return out;
 }
@@ -58,13 +71,14 @@ static std::unique_ptr<Person> parsePerson(const std::string& raw) {
     catch (const json::exception&) { throw std::invalid_argument("JSON 格式或字段类型不正确"); }
     if (!body.is_object()) throw std::invalid_argument("请求体必须是 JSON 对象");
     const auto type = textField(body, "type");
-    if (type != "teacher" && type != "admin")
-        throw std::invalid_argument("人员类别必须为 teacher 或 admin");
+    if (type != "teacher" && type != "admin" && type != "student" && type != "worker")
+        throw std::invalid_argument("人员类别必须为 teacher、admin、student 或 worker");
+    const int minimumAge = type == "student" ? 6 : 18;
     if (!body.contains("age") || !body.at("age").is_number_integer() ||
-        body.at("age") < 18 || body.at("age") > 100)
-        throw std::invalid_argument("年龄必须是 18 到 100 的整数");
-    if (!body.contains("salary") || !body.at("salary").is_number() ||
-        body.at("salary") < 0 || body.at("salary") > 100000000)
+        body.at("age") < minimumAge || body.at("age") > 100)
+        throw std::invalid_argument("年龄必须是 " + std::to_string(minimumAge) + " 到 100 的整数");
+    if (type != "student" && (!body.contains("salary") || !body.at("salary").is_number() ||
+        body.at("salary") < 0 || body.at("salary") > 100000000))
         throw std::invalid_argument("工资必须是 0 到 100000000 的数字");
     const auto id = textField(body, "id");
     const auto name = textField(body, "name");
@@ -72,18 +86,29 @@ static std::unique_ptr<Person> parsePerson(const std::string& raw) {
     const auto phone = textField(body, "phone", true);
     const auto department = textField(body, "department");
     const int age = body.at("age").get<int>();
+    if (type == "student") {
+        if (!body.contains("admissionYear") || !body.at("admissionYear").is_number_integer() ||
+            body.at("admissionYear") < 1900 || body.at("admissionYear") > 2100)
+            throw std::invalid_argument("入学年份必须是 1900 到 2100 的整数");
+        if (body.contains("salary") && (!body.at("salary").is_number() || body.at("salary") != 0))
+            throw std::invalid_argument("学生不设置工资，请移除 salary 字段");
+        return std::make_unique<Student>(id, name, gender, age, phone, department,
+            textField(body, "major"), textField(body, "className"), body.at("admissionYear").get<int>());
+    }
     const double salary = body.at("salary").get<double>();
     if (type == "teacher") return std::make_unique<Teacher>(id, name, gender, age,
         phone, department, textField(body, "title"), salary);
+    if (type == "worker") return std::make_unique<Worker>(id, name, gender, age,
+        phone, department, textField(body, "job"), salary);
     return std::make_unique<AdminStaff>(id, name, gender, age,
         phone, department, textField(body, "position"), salary);
 }
 static void sendServiceResult(httplib::Response& res, ServiceResult result, int success = 200) {
     switch (result) {
         case SVC_OK: sendJson(res, success, {{"ok", true}}); break;
-        case SVC_DUPLICATE: sendJson(res, 409, {{"error", "工号已存在"}}); break;
+        case SVC_DUPLICATE: sendJson(res, 409, {{"error", "工号或学号已存在"}}); break;
         case SVC_NOT_FOUND: sendJson(res, 404, {{"error", "未找到该人员"}}); break;
-        case SVC_BAD_REQUEST: sendJson(res, 400, {{"error", "人员信息不合法，请检查必填项、工号、年龄、电话和工资"}}); break;
+        case SVC_BAD_REQUEST: sendJson(res, 400, {{"error", "人员信息不合法，请检查编号、年龄、电话和类别对应的必填项"}}); break;
         case SVC_STORAGE_ERROR: sendJson(res, 503, {{"error", "数据库暂时不可用，请稍后重试"}}); break;
         default: sendJson(res, 500, {{"error", "服务器内部错误"}}); break;
     }

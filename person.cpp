@@ -8,8 +8,8 @@ Person::Person(string id, string name, string gender, int age, string phone)
 Person::~Person() {}
 
 // 录入基类字段
-void Person::inputBase() {
-    cout << "工号: ";
+void Person::inputBase(const string& idLabel) {
+    cout << idLabel << ": ";
     cin >> id;
     cout << "姓名: ";
     cin >> name;

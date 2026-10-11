@@ -6,7 +6,7 @@
 
 Ubuntu 配置、HTTPS 证书续期、数据库备份和更新步骤见 [deploy/README.md](deploy/README.md)。服务器部署使用独立管理员登录；数据库和实际凭据只保存在服务器，不进入 Git 仓库。
 
-当前运行地址：[https://swustmarket.xyz](https://swustmarket.xyz)。浏览器会弹出管理员登录框，凭据由管理员单独提供。2026 年 10 月 11 日已在 Ubuntu 24.04 上完成部署，验证页面、API、增删改查、重启后的数据库持久化和证书模拟续期。
+当前运行地址：[https://swustmarket.xyz](https://swustmarket.xyz)。浏览器会弹出管理员登录框，凭据由管理员单独提供。2026 年 10 月 11 日已在 Ubuntu 24.04 上完成四类人员部署，验证页面、API、增删改查、旧库数据保留、重启后的数据库持久化和证书模拟续期。
 
 ## 本地启动
 
@@ -41,10 +41,12 @@ Ubuntu 配置、HTTPS 证书续期、数据库备份和更新步骤见 [deploy/R
 
 ## 功能
 
-- 管理教师和行政人员，支持新增、编辑、删除与查询。
-- 记录工号、姓名、性别、年龄、联系电话、院系或部门、职称或职务、工资。
+- 管理教师、行政人员、学生和普通工作者，四类均支持新增、编辑、删除与查询。
+- 公共信息包括工号或学号、姓名、性别、年龄、联系电话和院系或部门。
+- 学生记录专业、班级和入学年份；普通工作者记录岗位和工资，适用于保安、保洁、维修等人员。
+- 工资统计只计算教师、行政人员和普通工作者，学生不设置工资；工资排序将学生放在末尾。
 - 按人员类别筛选，搜索人员，查看人数和工资统计。
-- 后端校验字段格式、工号唯一性和数值范围。
+- 后端校验字段格式、工号与学号的全校唯一性和数值范围；可按专业、班级、部门或岗位搜索。
 - SQLite 实际持久化：关闭服务后，已保存的数据仍保留在数据库中。
 - 前端显示后端连接状态，操作失败时保留输入并提示错误。
 
@@ -66,9 +68,11 @@ C++ DAO：backend/dao.cpp（参数化 SQL 和数据映射）
 SQLite：school.db / people 表
 ```
 
-`Person` 是包含公共属性和虚函数的抽象基类；`Teacher`、`AdminStaff` 通过继承扩展各自字段，借助多态提供统一的显示、工资统计与保存接口。Web 后端分为 HTTP 接口、业务逻辑、数据库访问三层，使协议处理和业务规则分开。
+`Person` 是包含公共属性和虚函数的抽象基类；`Teacher`、`AdminStaff`、`Student` 和 `Worker` 通过继承扩展各自字段，借助多态提供统一的显示、统计与保存接口。学生的 `getSalary()` 在统一 C++ 接口中返回 `0`，但学生不计入教职工工资统计，Web API 也不返回学生工资字段。Web 后端分为 HTTP 接口、业务逻辑、数据库访问三层，使协议处理和业务规则分开。
 
 SQLite 在 C++ 程序内部运行，因此数据库随后端一起启用。DAO 使用 SQL 参数绑定写入字段，工号为主键。Web 与控制台复用人员类，但**两者的数据各自独立**：Web 保存到 `school.db`，控制台保存到 `school_data.txt`，没有自动同步或导入功能。
+
+已有教师、行政人员数据库首次启动新版本时，会在事务内自动补充 `major`、`class_name`、`admission_year` 和 `job` 列，不删除旧记录。人员切换类别时会清理不适用的字段，例如学生转为工作者后清空专业与班级。工号、学号共用主键，不能给不同类别使用同一个编号。
 
 ## 项目文件
 
@@ -77,6 +81,8 @@ project6/
 ├── person.h / person.cpp                 人员基类
 ├── teacher.h / teacher.cpp               教师类
 ├── adminstaff.h / adminstaff.cpp         行政人员类
+├── student.h / student.cpp               学生类：学院、专业、班级、入学年份
+├── worker.h / worker.cpp                 普通工作者类：部门、岗位、工资
 ├── main.cpp                             控制台入口
 ├── personmanager.h / personmanager.cpp   控制台增删改查、统计与文本存储
 ├── utils.h                              控制台输入工具
@@ -99,6 +105,7 @@ project6/
 ├── start_server.ps1                     可选 PowerShell 启动入口
 ├── stop_server.ps1                      停止助手启动的本项目后台服务
 ├── tests/test_api.py                     标准库 HTTP / 数据库集成测试
+├── tests/test_console.py                 新类别控制台保存、加载与统计测试
 ├── build/                               新编译的可执行文件和中间产物
 ├── school.db                            Web 数据库（按需创建，原有数据保留）
 ├── school_data.txt                      控制台数据（保存后创建）
@@ -173,7 +180,28 @@ $env:SCHOOL_ADMIN_PASSWORD = 'replace-this-example-password'
 }
 ```
 
-行政人员使用 `"type":"admin"`，以 `position` 表示职务。API 中类别使用小写 `teacher` / `admin`；SQLite 表内保存的类别标识为 `Teacher` / `Admin`。字符串字段需符合后端规则；`age` 必须为 `18` 至 `100` 的整数，`salary` 必须为 `0` 至 `100000000` 的数值，不能以 JSON 字符串代替数字。编辑时路径中的工号定位原记录，请求体中的 `id` 可以提供新工号。
+API 中类别使用小写 `teacher` / `admin` / `student` / `worker`，SQLite 表内保存为 `Teacher` / `Admin` / `Student` / `Worker`。四类均需要 `id`、`name`、`gender`、`age` 和 `department`，`phone` 可省略；类别字段如下：
+
+| 类别 | 专属必填字段 | 年龄范围 |
+| --- | --- | --- |
+| 教师 `teacher` | `title`、`salary` | 18–100 |
+| 行政人员 `admin` | `position`、`salary` | 18–100 |
+| 学生 `student` | `major`、`className`、`admissionYear` | 6–100 |
+| 普通工作者 `worker` | `job`、`salary` | 18–100 |
+
+`age` 必须为整数，`salary` 必须为 `0` 至 `100000000` 的数值，`admissionYear` 必须为 `1900` 至 `2100` 的整数，不能用字符串或布尔值代替数字。学生不提交工资字段；非零学生工资会被拒绝。编辑时路径中的编号定位原记录，请求体中的 `id` 可以提供新工号或学号，类别也可修改。
+
+学生请求示例：
+
+```json
+{"type":"student","id":"202601001","name":"李小明","gender":"男","age":17,"phone":"","department":"计算机学院","major":"软件工程","className":"软件工程2026级1班","admissionYear":2026}
+```
+
+普通工作者请求示例：
+
+```json
+{"type":"worker","id":"W001","name":"王师傅","gender":"男","age":45,"phone":"","department":"后勤服务中心","job":"维修","salary":4800.50}
+```
 
 在另一 PowerShell 窗口检查服务：
 
@@ -197,7 +225,7 @@ curl.exe --user admin http://localhost:8080/api/people
 .\build\school_system.exe
 ```
 
-按菜单进行新增、删除、修改、查询、排序、统计与保存。控制台数据文件为 `school_data.txt`，与 Web 数据库独立。
+按菜单对四类人员进行新增、删除、修改、查询、排序、统计与保存。控制台数据文件为 `school_data.txt`，与 Web 数据库独立；旧教师、行政人员文本记录仍可加载。学生文本记录以 `Student|` 开头，普通工作者以 `Worker|` 开头。
 
 ## CMake 构建
 
@@ -238,7 +266,17 @@ python tests/test_api.py --server build-cmake/server.exe
 
 Linux 上同样支持 `python3 tests/test_api.py --server build-cmake/server`。测试自行选取空闲本机端口，使用临时目录和临时数据库，不访问项目现有 `school.db`；退出时关闭自己启动的服务进程。Windows 测试进程不显示额外控制台窗口。
 
-已在 Windows 和 Ubuntu 24.04 环境编译并通过 13 组后端集成测试，覆盖健康检查、静态页面、教师与行政人员增删改查、工号重复和修改、人员类别切换、字段与 JSON 校验、超过 64 KiB 的请求被拒绝、Unicode 转义姓名和工资小数保存、并发重复工号、进程重启后持久化、Basic 登录、非法配置与损坏数据库拒绝启动、外部数据库锁导致 `503` 后恢复，以及数据库表或记录编码损坏时健康接口和列表接口返回 `503`。服务器还通过了公网 HTTPS 登录、静态资源、实际增删改查、systemd 重启后持久化、SQLite 在线备份及证书模拟续期验证；部署临时测试记录已删除。
+后端集成测试共 16 组，覆盖四类人员的增删改查、编号跨类别唯一性、编号修改和类别切换、学生与工作者字段校验、旧数据库升级后保留原记录，以及重启后的持久化。还覆盖登录、Unicode、工资小数、并发、请求大小、数据库锁与损坏后的错误处理。测试只使用临时数据库。
+
+上述 16 组接口测试和控制台测试已在 Windows 与 Ubuntu 24.04 上通过。网页已验证学生与工作者表单、编辑回填、班级搜索和排除学生后的工资统计。公网还验证了两类人员的新增、编辑、编号冲突、服务重启后的持久化和删除；临时测试记录已清理，原有正式记录完整保留。
+
+新增类别的控制台验证可在编译控制台程序后运行：
+
+```powershell
+python tests/test_console.py
+```
+
+Ubuntu 可指定 CMake 产物：`python3 tests/test_console.py --console build-cmake/school_system`。测试覆盖学生与工作者录入、编辑、分类查询、保存与加载、删除，以及排除学生后的工资统计；不读取现有 `school_data.txt`。
 
 ## 本地问题排查
 

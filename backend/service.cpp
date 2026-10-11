@@ -1,6 +1,8 @@
 #include "service.h"
 #include "teacher.h"
 #include "adminstaff.h"
+#include "student.h"
+#include "worker.h"
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -85,7 +87,8 @@ bool validPhone(const string& phone) {
 }
 
 unique_ptr<Person> validatedClone(const Person& proto) {
-    if (!validId(proto.getId()) || proto.getAge() < 18 || proto.getAge() > 100 ||
+    const Student* student = dynamic_cast<const Student*>(&proto);
+    if (!validId(proto.getId()) || proto.getAge() < (student ? 6 : 18) || proto.getAge() > 100 ||
         !isfinite(proto.getSalary()) || proto.getSalary() < 0 || proto.getSalary() > 100000000)
         return unique_ptr<Person>();
     string name, gender, phone, department, role;
@@ -107,6 +110,23 @@ unique_ptr<Person> validatedClone(const Person& proto) {
             !normalizedText(admin->getPosition(), 128, true, role)) return unique_ptr<Person>();
         return unique_ptr<Person>(new AdminStaff(proto.getId(), name, gender, proto.getAge(),
                                                 phone, department, role, proto.getSalary()));
+    }
+    if (student && student->getType() == "学生") {
+        string className;
+        if (!normalizedText(student->getDepartment(), 128, true, department) ||
+            !normalizedText(student->getMajor(), 128, true, role) ||
+            !normalizedText(student->getClassName(), 128, true, className) ||
+            student->getAdmissionYear() < 1900 || student->getAdmissionYear() > 2100)
+            return unique_ptr<Person>();
+        return unique_ptr<Person>(new Student(proto.getId(), name, gender, proto.getAge(),
+                                  phone, department, role, className, student->getAdmissionYear()));
+    }
+    const Worker* worker = dynamic_cast<const Worker*>(&proto);
+    if (worker && worker->getType() == "普通工作者") {
+        if (!normalizedText(worker->getDepartment(), 128, true, department) ||
+            !normalizedText(worker->getJob(), 128, true, role)) return unique_ptr<Person>();
+        return unique_ptr<Person>(new Worker(proto.getId(), name, gender, proto.getAge(),
+                                             phone, department, role, proto.getSalary()));
     }
     return unique_ptr<Person>();
 }

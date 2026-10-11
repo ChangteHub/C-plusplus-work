@@ -8,14 +8,14 @@ using namespace std;
 // 人员基类（抽象类，不能直接实例化）
 class Person {
 protected:
-    string id;      // 工号
+    string id;      // 工号或学号，所有人员共用唯一编号
     string name;    // 姓名
     string gender;  // 性别
     int age;        // 年龄
     string phone;   // 联系电话
 
     // 录入基类字段（供派生类 input() 调用）
-    void inputBase();
+    void inputBase(const string& idLabel = "工号");
 
 public:
     Person(string id = "", string name = "", string gender = "",

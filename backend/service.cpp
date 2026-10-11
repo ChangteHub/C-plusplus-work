@@ -2,6 +2,7 @@
 #include "teacher.h"
 #include "adminstaff.h"
 #include "student.h"
+#include "graduate.h"
 #include "worker.h"
 #include <cmath>
 #include <iostream>
@@ -111,14 +112,21 @@ unique_ptr<Person> validatedClone(const Person& proto) {
         return unique_ptr<Person>(new AdminStaff(proto.getId(), name, gender, proto.getAge(),
                                                 phone, department, role, proto.getSalary()));
     }
-    if (student && student->getType() == "学生") {
+    if (student && (student->getType() == "学生" || student->getType() == "本科生" || student->getType() == "研究生")) {
         string className;
         if (!normalizedText(student->getDepartment(), 128, true, department) ||
             !normalizedText(student->getMajor(), 128, true, role) ||
             !normalizedText(student->getClassName(), 128, true, className) ||
             student->getAdmissionYear() < 1900 || student->getAdmissionYear() > 2100)
             return unique_ptr<Person>();
-        return unique_ptr<Person>(new Student(proto.getId(), name, gender, proto.getAge(),
+        if (const auto* graduate = dynamic_cast<const GraduateStudent*>(student)) {
+            string direction, supervisor;
+            if (proto.getAge() < 18 || !normalizedText(graduate->getResearchDirection(), 128, true, direction) ||
+                !normalizedText(graduate->getSupervisor(), 128, true, supervisor)) return {};
+            return make_unique<GraduateStudent>(proto.getId(), name, gender, proto.getAge(), phone,
+                department, role, className, student->getAdmissionYear(), direction, supervisor);
+        }
+        return unique_ptr<Person>(new Undergraduate(proto.getId(), name, gender, proto.getAge(),
                                   phone, department, role, className, student->getAdmissionYear()));
     }
     const Worker* worker = dynamic_cast<const Worker*>(&proto);
@@ -139,6 +147,7 @@ ServiceResult storageFailure(const runtime_error& error) {
 } // namespace
 
 vector<Person*> Service::list() { return dao.all(); }
+unique_ptr<Person> Service::normalize(const Person& proto) { return validatedClone(proto); }
 
 ServiceResult Service::create(const Person& proto) {
     unique_ptr<Person> person = validatedClone(proto);

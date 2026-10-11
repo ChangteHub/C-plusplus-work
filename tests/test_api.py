@@ -369,9 +369,9 @@ def test_auth(executable, directory):
     headers = {"Authorization": "Basic " + encoded}
     with Server(executable, directory, {"SCHOOL_ADMIN_USER": username, "SCHOOL_ADMIN_PASSWORD": password}) as server:
         server.expect("GET", "/api/health", 200)
-        for path in ("/", "/app.js", "/api/people"):
-            _, response_headers = server.expect("GET", path, 401)
-            require("Basic" in response_headers.get("WWW-Authenticate", ""), "missing Basic auth challenge")
+        server.expect("GET", "/", 200)
+        server.expect("GET", "/app.js", 200)
+        server.expect("GET", "/api/people", 401)
         server.expect("GET", "/api/people", 401, headers={"Authorization": "Basic invalid"})
         server.expect("GET", "/", 200, headers=headers)
         server.expect("GET", "/api/people", 200, headers=headers)

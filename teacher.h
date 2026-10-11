@@ -4,7 +4,7 @@
 #include "person.h"
 
 // 教师类
-class Teacher : public Person {
+class Teacher : virtual public Person {
 private:
     string department;  // 所属院系
     string title;       // 职称

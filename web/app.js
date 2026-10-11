@@ -11,7 +11,8 @@ const $ = (id) => document.getElementById(id);
 const TYPES = {
   teacher: { label: "教师", role: "title", roleLabel: "职称", roleHint: "如 教授", deptHint: "如 计算机学院", idHint: "如 T001" },
   admin: { label: "行政人员", role: "position", roleLabel: "职务", roleHint: "如 会计", deptHint: "如 财务处", idHint: "如 A001" },
-  student: { label: "学生", role: "major", roleLabel: "专业", roleHint: "如 软件工程", deptHint: "如 计算机学院", idHint: "如 202601001" },
+  student: { label: "本科生", role: "major", roleLabel: "专业", roleHint: "如 软件工程", deptHint: "如 计算机学院", idHint: "如 202601001" },
+  graduate: { label: "研究生", role: "major", roleLabel: "专业", roleHint: "如 计算机科学与技术", deptHint: "如 计算机学院", idHint: "如 G202601" },
   worker: { label: "普通工作者", role: "job", roleLabel: "岗位", roleHint: "如 保安、保洁或维修", deptHint: "如 后勤服务中心", idHint: "如 W001" },
 };
 const els = Object.fromEntries([
@@ -42,7 +43,7 @@ async function request(path, options = {}, requireJson = false) {
   try {
     const response = await fetch(path, {
       credentials: "same-origin", cache: "no-store", ...options, signal: controller.signal,
-      headers: { Accept: "application/json", ...options.headers },
+      headers: { Authorization: "Session", Accept: "application/json", ...options.headers },
     });
     // HTTP 2xx 已确认写入成功；不要因响应正文损坏而引导用户重复写入。
     if (response.ok && !requireJson) return null;
@@ -51,7 +52,7 @@ async function request(path, options = {}, requireJson = false) {
     if (!response.ok) {
       const serverMessage = data && (typeof data.error === "string" ? data.error : typeof data.message === "string" ? data.message : "");
       const defaults = {
-        401: "身份认证失败，请使用服务器配置的账号重新登录",
+        401: "登录已失效，请重新登录",
         403: "没有执行此操作的权限", 404: "人员记录不存在，请刷新列表",
         409: "工号或学号已存在，请更换", 413: "提交的信息过长",
         429: "请求过于频繁，请稍后再试",
@@ -116,7 +117,7 @@ function validList(data) {
       !Object.hasOwn(TYPES, person.type) || typeof person.id !== "string" ||
       typeof person.name !== "string" || !Number.isFinite(person.age) ||
       typeof person.department !== "string" || typeof person[TYPES[person.type].role] !== "string" ||
-      (person.type === "student" ? typeof person.className !== "string" || !Number.isInteger(person.admissionYear) : !Number.isFinite(person.salary)))) {
+      (isStudent(person.type) ? typeof person.className !== "string" || !Number.isInteger(person.admissionYear) : !Number.isFinite(person.salary)))) {
     throw new ApiError("服务器返回的人员列表格式有误，请重试");
   }
   return data;
@@ -170,8 +171,9 @@ function render() {
   renderTable();
 }
 
+function isStudent(type) { return type === "student" || type === "graduate"; }
 function salaryOrder(a, b, direction) {
-  if (a.type === "student" || b.type === "student") return Number(a.type === "student") - Number(b.type === "student");
+  if (isStudent(a.type) || isStudent(b.type)) return Number(isStudent(a.type)) - Number(isStudent(b.type));
   return direction * (a.salary - b.salary);
 }
 
@@ -180,9 +182,9 @@ function renderStats() {
   els.statTotal.textContent = state.loaded ? String(list.length) : "—";
   els.statTeacher.textContent = state.loaded ? String(list.filter((person) => person.type === "teacher").length) : "—";
   els.statAdmin.textContent = state.loaded ? String(list.filter((person) => person.type === "admin").length) : "—";
-  els.statStudent.textContent = state.loaded ? String(list.filter((person) => person.type === "student").length) : "—";
+  els.statStudent.textContent = state.loaded ? String(list.filter((person) => isStudent(person.type)).length) : "—";
   els.statWorker.textContent = state.loaded ? String(list.filter((person) => person.type === "worker").length) : "—";
-  const employees = list.filter((person) => person.type !== "student");
+  const employees = list.filter((person) => !isStudent(person.type));
   els.statSalary.textContent = state.loaded ? formatMoney(employees.length ? employees.reduce((sum, person) => sum + person.salary, 0) / employees.length : 0, true) : "—";
 }
 
@@ -218,16 +220,16 @@ function renderTable() {
     badge.textContent = TYPES[person.type].label;
     typeCell.append(badge);
     const roleCell = cell(person[TYPES[person.type].role] || "—");
-    if (person.type === "student") {
+    if (isStudent(person.type)) {
       const detail = document.createElement("small");
       detail.className = "cell-detail";
-      detail.textContent = `${person.className} · ${person.admissionYear} 年入学`;
+      detail.textContent = `${person.className} · ${person.admissionYear} 年入学${person.type === "graduate" ? ` · ${person.researchDirection} / 导师 ${person.supervisor}` : ""}`;
       roleCell.append(detail);
     }
     row.append(typeCell, cell(person.id, "cell-id"), cell(person.name, "cell-name"),
       cell(person.gender), cell(person.age, "ta-c"), cell(person.phone || "—"),
       cell(person.department || "—"), roleCell,
-      cell(person.type === "student" ? "—" : formatMoney(person.salary), "ta-r"));
+      cell(isStudent(person.type) ? "—" : formatMoney(person.salary), "ta-r"));
     const actionsCell = cell("", "ta-c");
     const actions = document.createElement("div");
     actions.className = "row-actions";
@@ -256,7 +258,7 @@ function renderTable() {
 function activateDialog(overlay, focusTarget) {
   state.returnFocus = document.activeElement;
   overlay.hidden = false;
-  for (const id of ["pageHeader", "pageMain"]) $(id).inert = true;
+  for (const id of ["pageHeader", "pageMain", "portalMain", "authView"]) $(id).inert = true;
   document.body.classList.add("dialog-open");
   focusTarget.focus();
 }
@@ -264,7 +266,7 @@ function activateDialog(overlay, focusTarget) {
 function hideDialog(overlay, force = false) {
   if (state.busy && !force) return false;
   overlay.hidden = true;
-  for (const id of ["pageHeader", "pageMain"]) $(id).inert = false;
+  for (const id of ["pageHeader", "pageMain", "portalMain", "authView"]) $(id).inert = false;
   document.body.classList.remove("dialog-open");
   const previous = state.returnFocus;
   state.returnFocus = null;
@@ -286,6 +288,8 @@ function openModal(person = null) {
   if (!state.online || state.busy || state.loading) return;
   state.editingId = person ? person.id : null;
   els.personForm.reset();
+  $("signupPasswordField").hidden = !state.signup;
+  $("signupPassword").required = !!state.signup;
   setType(person ? person.type : state.filter === "all" ? "teacher" : state.filter);
   els.modalTitle.textContent = person ? "编辑人员" : "添加人员";
   $("fieldId").value = person ? person.id : "";
@@ -296,9 +300,11 @@ function openModal(person = null) {
   $("fieldDept").value = person ? person.department || "" : "";
   $("fieldRole").value = person ? person[TYPES[person.type].role] || "" : "";
   $("fieldClass").value = person ? person.className || "" : "";
-  $("fieldYear").value = person && person.type === "student" ? String(person.admissionYear) : String(new Date().getFullYear());
+  $("fieldYear").value = person && isStudent(person.type) ? String(person.admissionYear) : String(new Date().getFullYear());
   // 直接使用服务器数值，显示金额格式不参与编辑和保存。
-  $("fieldSalary").value = person && person.type !== "student" ? String(person.salary) : "";
+  $("fieldSalary").value = person && !isStudent(person.type) ? String(person.salary) : "";
+  $("fieldResearch").value = person ? person.researchDirection || "" : "";
+  $("fieldSupervisor").value = person ? person.supervisor || "" : "";
   clearErrors();
   activateDialog(els.modalOverlay, $("fieldId"));
 }
@@ -315,17 +321,21 @@ function setType(type) {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   }
-  const student = type === "student";
+  const student = isStudent(type);
   $("labelId").textContent = student ? "学号 *" : "工号 *";
   $("labelDept").textContent = student ? "所属学院 *" : type === "teacher" ? "所属院系 *" : "所属部门 *";
   $("labelRole").textContent = `${TYPES[type].roleLabel} *`;
   $("fieldId").placeholder = TYPES[type].idHint;
   $("fieldDept").placeholder = TYPES[type].deptHint;
   $("fieldRole").placeholder = TYPES[type].roleHint;
-  $("fieldAge").min = student ? "6" : "18";
+  $("fieldAge").min = type === "student" ? "6" : "18";
   $("fieldAge").placeholder = student ? "如 18" : "如 35";
   $("studentClassField").hidden = !student;
   $("studentYearField").hidden = !student;
+  $("researchField").hidden = type !== "graduate";
+  $("supervisorField").hidden = type !== "graduate";
+  $("fieldResearch").required = type === "graduate";
+  $("fieldSupervisor").required = type === "graduate";
   $("salaryField").hidden = student;
   $("fieldClass").required = student;
   $("fieldYear").required = student;
@@ -353,8 +363,8 @@ function readForm() {
   if (!/^[A-Za-z0-9_-]{1,32}$/.test(id)) return invalid("fieldId", "工号或学号须为 1–32 位字母、数字、下划线或连字符");
   if (!name || [...name].length > 64) return invalid("fieldName", "请输入姓名，最多 64 个字符");
   if (!["男", "女", "其他"].includes(gender)) return invalid("fieldGender", "请选择有效的性别");
-  const student = state.formType === "student";
-  const minimumAge = student ? 6 : 18;
+  const student = isStudent(state.formType);
+  const minimumAge = state.formType === "student" ? 6 : 18;
   if (!ageText || !Number.isInteger(age) || age < minimumAge || age > 100) return invalid("fieldAge", `年龄须为 ${minimumAge}–100 的整数`);
   if (!validPhone(phone)) return invalid("fieldPhone", "联系电话须包含 6–20 位数字，最多 32 个字符；可使用开头的 +、配对括号、空格、连字符或小数点");
   if (!department || [...department].length > 128) return invalid("fieldDept", "请输入院系或部门，最多 128 个字符");
@@ -365,6 +375,12 @@ function readForm() {
     const className = value("fieldClass"), yearText = value("fieldYear"), admissionYear = Number(yearText);
     if (!className || [...className].length > 128) return invalid("fieldClass", "请输入班级，最多 128 个字符");
     if (!yearText || !Number.isInteger(admissionYear) || admissionYear < 1900 || admissionYear > 2100) return invalid("fieldYear", "入学年份须为 1900–2100 的整数");
+    if (state.formType === "graduate") {
+      const researchDirection=value("fieldResearch"), supervisor=value("fieldSupervisor");
+      if (!researchDirection || [...researchDirection].length>128) return invalid("fieldResearch", "请填写研究方向，最多 128 个字符");
+      if (!supervisor || [...supervisor].length>128) return invalid("fieldSupervisor", "请填写导师，最多 128 个字符");
+      return {...person,className,admissionYear,researchDirection,supervisor};
+    }
     return { ...person, className, admissionYear };
   }
   if (!salaryText || !Number.isFinite(salary) || salary < 0 || salary > 100000000) return invalid("fieldSalary", "工资须为 0–100,000,000 元之间的有效数字");
@@ -400,6 +416,7 @@ async function savePerson() {
   if (!state.online || state.busy || state.loading) return;
   const person = readForm();
   if (!person) return;
+  if (state.signup) { await submitRegistration(person); return; }
   const originalId = state.editingId;
   const editing = originalId !== null;
   state.busy = true;
@@ -514,4 +531,4 @@ function bindEvents() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => { bindEvents(); refresh(); });
+document.addEventListener("DOMContentLoaded", () => { bindEvents(); bootPortal(); });

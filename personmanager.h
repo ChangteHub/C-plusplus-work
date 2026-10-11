@@ -7,7 +7,7 @@
 // 人员信息管理系统
 class PersonManager {
 private:
-    vector<Person*> people;  // 使用基类指针实现多态
+    std::vector<Person*> people;  // 使用基类指针实现多态
 
     // 辅助函数
     void clearPeople();

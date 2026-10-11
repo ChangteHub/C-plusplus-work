@@ -19,7 +19,7 @@ if not exist build (
 
 echo 正在编译 C++ 控制台程序...
 g++ -std=c++17 -O2 -Wall -o build\school_system.exe ^
-    main.cpp person.cpp teacher.cpp adminstaff.cpp student.cpp worker.cpp personmanager.cpp
+    main.cpp person.cpp teacher.cpp adminstaff.cpp student.cpp worker.cpp graduate.cpp personmanager.cpp
 if errorlevel 1 (
     echo [错误] 控制台程序编译失败，请检查上方信息。
     popd

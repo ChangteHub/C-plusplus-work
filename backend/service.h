@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 #include "dao.h"
 #include "person.h"
 
@@ -21,6 +22,7 @@ private:
     Dao& dao;
 
 public:
+    static std::unique_ptr<Person> normalize(const Person& proto);
     explicit Service(Dao& d) : dao(d) {}
 
     // 数据库错误抛 runtime_error；返回值里的对象由调用方释放。

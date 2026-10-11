@@ -25,7 +25,7 @@
 
 以下操作由管理员在 Ubuntu 上执行。先检查现有网站和服务，避免覆盖其他项目；宝塔自带的 Nginx 与系统 Nginx 应选择一个运行。本配置针对 `/usr/sbin/nginx` 和 `/etc/nginx`。
 
-1. 安装 `g++`、`gcc`、`cmake`、`make`、`nginx`、`certbot`、`python3`。项目已自带 SQLite、JSON 和 HTTP 库源码。
+1. 安装 `g++`、`gcc`、`cmake`、`make`、`libssl-dev`、`nginx`、`certbot`、`python3`。项目已自带 SQLite、JSON 和 HTTP 库源码；个人密码与随机令牌通过系统 OpenSSL libcrypto 实现。
 2. 将对应 Git 版本的源码放入新的发布目录，执行：
 
    ```bash
@@ -33,7 +33,9 @@
      -B /opt/school-personnel/releases/<版本>/build-cmake -DCMAKE_BUILD_TYPE=Release
    cmake --build /opt/school-personnel/releases/<版本>/build-cmake -j1
    cd /opt/school-personnel/releases/<版本>
+   ctest --test-dir build-cmake --output-on-failure
    python3 tests/test_api.py --server build-cmake/server
+   python3 tests/test_academy.py --server build-cmake/server
    python3 tests/test_console.py --console build-cmake/school_system
    ```
 
@@ -60,7 +62,7 @@
    此方式未登记联系邮箱，证书到期提醒依赖服务器运维；也可使用自己的邮箱替代 `--register-unsafely-without-email`。
 
 9. 用 `nginx.https.conf` 替换初始配置，运行 `nginx -t` 再 reload。将 `renew-nginx.sh` 安装到 `/etc/letsencrypt/renewal-hooks/deploy/school-personnel-nginx.sh`，权限 `0755`，启用 `certbot.timer`。通过 `certbot renew --dry-run` 验证续期。
-10. 验证 HTTP 跳转 HTTPS、未登录返回 `401`、登录后页面和增删改查正常，以及后端重启后记录仍存在。
+10. 验证 HTTP 跳转 HTTPS、公开登录页返回 `200`、未登录的 `/api/people` 返回 `401`，以及登录、个人权限、课程成绩和重启保存。网页采用表单及 Cookie 登录；管理员 Basic API 调用仍兼容。Nginx 需转发 Host、Authorization 和 X-Forwarded-Proto，后者用于设置 Secure Cookie 与来源验证。
 
 ## 日常运维
 
@@ -72,7 +74,7 @@ systemctl restart school-personnel
 systemctl list-timers certbot.timer
 ```
 
-修改网站登录密码时，使用 `sudoedit /etc/school-personnel/environment` 编辑 `SCHOOL_ADMIN_PASSWORD`，保持文件 `0600`，然后重启 `school-personnel`。浏览器可能缓存 Basic 登录信息，修改后可使用隐私窗口重新登录。
+修改系统管理员密码时，使用 `sudoedit /etc/school-personnel/environment` 编辑 `SCHOOL_ADMIN_PASSWORD`，保持文件 `0600`，然后重启 `school-personnel`。重启会使旧管理员会话失效。个人密码由本人登录后修改，盐和散列保存在 accounts 表，修改后本人旧会话全部失效。管理员关闭账号会保留人员和成绩；个人销户会删除本人档案、账号和成绩。
 
 数据备份使用 SQLite 备份接口，可在后端运行时执行：
 
@@ -86,3 +88,7 @@ python3 /opt/school-personnel/current/tools/backup_database.py \
 不要仅复制正在运行的 `.db` 文件，也不要删除 `.db-wal`。更新代码时先备份数据库，将新源码放入新的发布目录，编译并通过测试后更新 `current`，再重启服务。数据库和环境配置无需随发布复制。
 
 学生与普通工作者版本会自动扩展现有 `people` 表，保留原来的教师、行政人员记录。更新前需备份正式数据库。旧版程序无法识别 `Student` / `Worker` 记录；添加这两类记录后，不能仅切换回旧程序。若确需回退旧版，需停机恢复更新前的完整 SQLite 备份，并明确这会恢复到备份时的数据状态；应先额外备份当前数据库。
+
+个人账号与课程版本会增加研究方向、导师字段及 accounts、sessions、courses、grades 表。添加研究生后旧程序同样无法识别其类型；回退时必须评估新数据，不能只切换旧二进制。更新前停服务、完整备份，测试后切换 current 并检查健康；健康失败时先停止新服务，再按保留的数据库备份恢复旧库，随后启动旧版本。
+
+管理员可导出 `/api/storage/export`，会在数据库目录生成 `school.db.export.json`，仅所有者可读写，包含个人账号盐和密码散列。这是私有业务资料导出，不包含管理员配置密码或令牌，不能放到 web 静态目录或 Git。JSON 导入未实现，完整恢复使用 SQLite 备份。UMask=0077 和服务目录权限继续保留。

@@ -10,4 +10,6 @@
 
 JSON 单头文件下载时的 SHA-256：`aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63`。
 
+个人账号密码派生与随机数使用系统加密库，未复制其实现源码：Windows 链接 BCrypt（系统组件），Ubuntu 链接 OpenSSL libcrypto（需 libssl-dev）。接口依据 [Microsoft BCrypt 文档](https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptderivekeypbkdf2) 与 [OpenSSL PBKDF2 文档](https://docs.openssl.org/3.5/man3/PKCS5_PBKDF2_HMAC/)。Windows 与 Linux 使用相同参数，测试通过 Python hashlib 校验。
+
 SQLite 从原有 3.51.1 更新至 3.51.3，包含官方 [WAL 并发写入修复](https://sqlite.org/wal.html)。依赖自身的版权声明保留在源码中；MIT 许可文本保存在 `licenses/`。

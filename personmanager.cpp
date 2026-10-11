@@ -3,6 +3,7 @@
 #include "adminstaff.h"
 #include "student.h"
 #include "worker.h"
+#include "graduate.h"
 #include "utils.h"
 #include <algorithm>
 #include <fstream>
@@ -36,6 +37,7 @@ void PersonManager::addPerson() {
     cout << "2. 行政人员\n";
     cout << "3. 学生\n";
     cout << "4. 普通工作者\n";
+    cout << "5. 研究生\n";
     cout << "0. 返回\n";
     int choice = readInt("请选择类别: ");
 
@@ -49,11 +51,13 @@ void PersonManager::addPerson() {
         a->input();
         p = a;
     } else if (choice == 3) {
-        p = new Student();
+        p = new Undergraduate();
         p->input();
     } else if (choice == 4) {
         p = new Worker();
         p->input();
+    } else if (choice == 5) {
+        p = new GraduateStudent(); p->input();
     } else if (choice == 0) {
         return;
     } else {
@@ -90,6 +94,7 @@ void PersonManager::deletePerson() {
     }
 
     cout << "找到以下人员:\n";
+    cout << *people[idx] << "\n";
     people[idx]->display();
     string confirm;
     cout << "确认删除？(y/n): ";
@@ -130,8 +135,10 @@ void PersonManager::modifyPerson() {
         Teacher* t = new Teacher();
         t->input();
         p = t;
-    } else if (type == "学生") {
-        p = new Student();
+    } else if (type == "研究生") {
+        p = new GraduateStudent(); p->input();
+    } else if (type == "学生" || type == "本科生") {
+        p = new Undergraduate();
         p->input();
     } else if (type == "普通工作者") {
         p = new Worker();
@@ -190,13 +197,13 @@ void PersonManager::searchPerson() const {
         }
         if (!found) cout << "未找到该姓名的人员！\n";
     } else if (choice == 3) {
-        cout << "1. 教师\n2. 行政人员\n3. 学生\n4. 普通工作者\n";
+        cout << "1. 教师\n2. 行政人员\n3. 学生\n4. 普通工作者\n5. 研究生\n";
         int t = readInt("请选择类别: ");
-        if (t < 1 || t > 4) { cout << "无效选择！\n"; return; }
-        string type = t == 1 ? "教师" : t == 2 ? "行政人员" : t == 3 ? "学生" : "普通工作者";
+        if (t < 1 || t > 5) { cout << "无效选择！\n"; return; }
+        string type = t == 1 ? "教师" : t == 2 ? "行政人员" : t == 3 ? "本科生" : t == 4 ? "普通工作者" : "研究生";
         bool found = false;
         for (size_t i = 0; i < people.size(); ++i) {
-            if (people[i]->getType() == type) {
+            if (people[i]->getType() == type || (type == "本科生" && people[i]->getType() == "学生")) {
                 people[i]->display();
                 found = true;
             }
@@ -249,12 +256,13 @@ void PersonManager::statistics() const {
     for (size_t i = 0; i < people.size(); ++i) {
         if (people[i]->getType() == "教师") teacherCount++;
         else if (people[i]->getType() == "行政人员") adminCount++;
-        else if (people[i]->getType() == "学生") studentCount++;
+        else if (dynamic_cast<Student*>(people[i])) studentCount++;
         else if (people[i]->getType() == "普通工作者") workerCount++;
         totalSalary += people[i]->getSalary();
         ageSum += people[i]->getAge();
     }
 
+    cout << "内存中人员对象: " << Person::getLiveCount() << "\n";
     cout << "总人数: " << total << "\n";
     cout << "教师人数: " << teacherCount << "\n";
     cout << "行政人员数: " << adminCount << "\n";
@@ -298,8 +306,8 @@ void PersonManager::sortBySalary() const {
     vector<Person*> tmp = people;
     std::sort(tmp.begin(), tmp.end(),
               [](Person* a, Person* b) {
-                  if (a->getType() == "学生" || b->getType() == "学生")
-                      return a->getType() != "学生" && b->getType() == "学生";
+                  if (dynamic_cast<Student*>(a) || dynamic_cast<Student*>(b))
+                      return !dynamic_cast<Student*>(a) && dynamic_cast<Student*>(b);
                   return a->getSalary() > b->getSalary();
               });
     printHeader();
@@ -360,8 +368,10 @@ Person* PersonManager::createPersonFromLine(const string& line) const {
         return new AdminStaff(f[1], f[2], f[3], atoi(f[4].c_str()),
                               f[5], f[6], f[7], atof(f[8].c_str()));
     } else if (f[0] == "Student" && f.size() >= 10) {
-        return new Student(f[1], f[2], f[3], atoi(f[4].c_str()), f[5], f[6],
+        return new Undergraduate(f[1], f[2], f[3], atoi(f[4].c_str()), f[5], f[6],
                            f[7], f[8], atoi(f[9].c_str()));
+    } else if (f[0] == "Graduate" && f.size() >= 12) {
+        return new GraduateStudent(f[1], f[2], f[3], atoi(f[4].c_str()), f[5], f[6], f[7], f[8], atoi(f[9].c_str()), f[10], f[11]);
     } else if (f[0] == "Worker" && f.size() >= 9) {
         return new Worker(f[1], f[2], f[3], atoi(f[4].c_str()),
                           f[5], f[6], f[7], atof(f[8].c_str()));

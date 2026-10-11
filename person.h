@@ -3,10 +3,15 @@
 
 #include <string>
 #include <iostream>
-using namespace std;
+#include <atomic>
+// 头文件仅引入使用的名称，避免 std::byte 与 Windows SDK 的 byte 冲突。
+using std::atomic;
+using std::ostream;
+using std::string;
 
 // 人员基类（抽象类，不能直接实例化）
 class Person {
+    static atomic<int> liveCount;
 protected:
     string id;      // 工号或学号，所有人员共用唯一编号
     string name;    // 姓名
@@ -20,7 +25,11 @@ protected:
 public:
     Person(string id = "", string name = "", string gender = "",
            int age = 0, string phone = "");
+    Person(const Person& other);
     virtual ~Person();
+    static int getLiveCount() { return liveCount.load(); }
+    // 友元输出运算符：统一输出任意派生人员的公共信息。
+    friend ostream& operator<<(ostream& os, const Person& person);
 
     // 访问器
     string getId() const { return id; }

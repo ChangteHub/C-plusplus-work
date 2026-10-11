@@ -27,6 +27,38 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.portal-nav { display:flex; gap:10px; flex-wrap:wrap; padding-top:24px; padding-bottom:0; }
+.user-label { color:var(--text-2); font-size:13px; }
+.auth-shell { min-height:90vh; display:grid; grid-template-columns:1.2fr 1fr; gap:8vw; align-items:center; max-width:1150px; }
+.auth-story h1 { font-size:clamp(32px,4vw,58px); line-height:1.35; margin:20px 0; letter-spacing:-2px; }
+.auth-story>p { max-width:440px; color:var(--text-2); line-height:1.9; }
+.auth-facts { display:flex; gap:24px; margin-top:40px; color:var(--mint); font-size:13px; }
+.auth-card { padding:36px; border-radius:var(--r-lg); }
+.auth-card h2 { font-size:23px; margin-bottom:16px; }
+.auth-card .field { margin:22px 0; }
+.auth-card form>.btn { width:100%; margin-top:8px; }
+.auth-register { display:flex; justify-content:space-between; align-items:center; margin-top:22px; color:var(--text-2); font-size:14px; }
+.portal-panel { padding:28px; }
+.portal-panel h2 { font-size:21px; margin-bottom:20px; }
+.portal-panel h3 { font-size:16px; margin:20px 0; }
+.portal-panel .field { margin:14px 0; }
+.profile-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:25px; padding:12px 0 28px; }
+.profile-grid dt { color:var(--text-3); font-size:12px; margin-bottom:8px; }
+.profile-grid dd { line-height:1.7; overflow-wrap:anywhere; }
+.profile-actions { display:grid; grid-template-columns:1fr 1fr; gap:40px; border-top:1px solid var(--glass-border); }
+.course-layout { display:grid; grid-template-columns:310px minmax(0,1fr); gap:32px; }
+.grade-form { display:flex; align-items:end; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+.grade-form .field { flex:1; min-width:120px; }
+.grade-form>.btn { margin-bottom:14px; }
+.form-buttons { display:flex; gap:10px; flex-wrap:wrap; margin-top:24px; }
+.badge.graduate { color:var(--amber); background:rgba(255,199,107,.12); }
+.portal-confirm { color:var(--text-1); padding:30px; border-radius:20px; margin:auto; max-width:480px; width:calc(100% - 32px); }
+.portal-confirm h2 { margin-bottom:20px; }
+.portal-confirm p { line-height:1.8; }
+.portal-confirm::backdrop { background:rgba(0,0,0,.72); backdrop-filter:blur(7px); }
+.type-switch { flex-wrap:wrap; }
+@media(max-width:850px){ .auth-shell{grid-template-columns:1fr;gap:30px;padding-top:60px;padding-bottom:40px;} .auth-story h1{font-size:38px;} .auth-facts{margin-top:22px;} .course-layout{grid-template-columns:1fr;} .profile-grid{grid-template-columns:repeat(2,minmax(0,1fr));} .profile-actions{grid-template-columns:1fr;gap:10px;} .user-label{display:none;} .auth-card{padding:26px;} }
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { color-scheme: dark; }

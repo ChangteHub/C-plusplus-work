@@ -17,10 +17,13 @@ public:
 };
 
 class Dao {
+    // Academy 使用同一把锁、同一连接，原子写入人员及账号，避免孤立账号。
+    friend class Academy;
 private:
     void* db;
     bool opened;
     mutex dbMutex;
+    bool insertUnlocked(Person* person);
 
     Dao(const Dao&) = delete;
     Dao& operator=(const Dao&) = delete;

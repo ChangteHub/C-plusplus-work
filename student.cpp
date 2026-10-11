@@ -17,7 +17,7 @@ void Student::input() {
 
 void Student::display() const {
     cout << "----------------------------------------\n"
-         << "人员类别: 学生\n学号: " << id << "\n姓名: " << name
+         << "人员类别: " << getType() << "\n学号: " << id << "\n姓名: " << name
          << "\n性别: " << gender << "\n年龄: " << age << "\n联系电话: " << phone
          << "\n所属学院: " << department << "\n专业: " << major
          << "\n班级: " << className << "\n入学年份: " << admissionYear
@@ -35,3 +35,8 @@ void Student::save(ostream& os) const {
        << phone << '|' << department << '|' << major << '|' << className
        << '|' << admissionYear << '\n';
 }
+
+Undergraduate::Undergraduate(string id, string name, string gender, int age, string phone,
+    string department, string major, string className, int admissionYear)
+    : Person(id, name, gender, age, phone),
+      Student(id, name, gender, age, phone, department, major, className, admissionYear) {}

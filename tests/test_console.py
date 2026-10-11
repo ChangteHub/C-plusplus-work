@@ -43,9 +43,16 @@ def main():
         assert "Student|S002|" in data and "软件2026级2班" in data, "editing a student must preserve its type and fields"
         assert "Worker|W002|" in data and "维修|4800.65" in data, "editing a worker must preserve its type and job"
         output = run(executable, directory, ["10", "4", "3", "3", "4", "3", "4", "2", "S002", "y", "6", "9", "0"])
-        assert "人员类别: 学生" in output and "人员类别: 普通工作者" in output, "category search must find both new types"
+        assert "人员类别: 本科生" in output and "人员类别: 普通工作者" in output, "category search must find both new types"
         assert "学生人数: 0" in output and "普通工作者人数: 1" in output, "deleting one category must preserve the other"
         assert "教职工平均工资: 4800.65" in output, "worker salary must survive save/load"
+        output=run(executable,directory,["10","1","5","G001","研究生验证","男","23","13800138002","计算机学院","软件工程","研一1班","2026","智能控制","李老师","6","9","0"])
+        assert "研究生人数" in output or "学生人数: 1" in output
+        data=(directory/"school_data.txt").read_text(encoding="utf-8")
+        assert "Graduate|G001|" in data and "智能控制|李老师" in data
+        output=run(executable,directory,["10","4","1","G001","6","0"])
+        assert "研究方向: 智能控制" in output and "导师: 李老师" in output
+        assert "教职工平均工资: 4800.65" in output
     print("PASS console student/worker entry, edits, category search, save/load, deletion and salary statistics")
 
 

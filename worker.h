@@ -10,6 +10,7 @@ class Worker : public Person {
 public:
     Worker(string id = "", string name = "", string gender = "", int age = 0,
            string phone = "", string department = "", string job = "", double salary = 0);
+    ~Worker() override = default;
     string getDepartment() const { return department; }
     string getJob() const { return job; }
     string getType() const override { return "普通工作者"; }

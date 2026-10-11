@@ -33,9 +33,9 @@ if errorlevel 1 (
 
 echo [2/2] 编译 C++ HTTP 服务...
 g++ -std=c++17 -O2 -Wall -I. -Ibackend ^
-    backend\web_server.cpp backend\service.cpp backend\dao.cpp ^
-    person.cpp teacher.cpp adminstaff.cpp student.cpp worker.cpp build\sqlite3.o ^
-    -lws2_32 -o build\server.exe
+    backend\web_server.cpp backend\service.cpp backend\dao.cpp backend\person_codec.cpp backend\academy.cpp backend\crypto.cpp backend\routes.cpp ^
+    person.cpp teacher.cpp adminstaff.cpp student.cpp worker.cpp graduate.cpp build\sqlite3.o ^
+    -lws2_32 -lbcrypt -o build\server.exe
 if errorlevel 1 (
     echo [错误] 后端编译失败，请检查上方信息。
     popd

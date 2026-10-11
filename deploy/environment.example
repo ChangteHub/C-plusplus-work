@@ -1,0 +1,6 @@
+SCHOOL_HOST=127.0.0.1
+SCHOOL_PORT=18080
+SCHOOL_DB_PATH=/var/lib/school-personnel/school.db
+SCHOOL_WEB_ROOT=/opt/school-personnel/current/web
+SCHOOL_ADMIN_USER=admin
+SCHOOL_ADMIN_PASSWORD=replace-with-a-unique-random-password

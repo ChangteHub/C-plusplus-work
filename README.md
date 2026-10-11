@@ -1,6 +1,12 @@
 # 学校人员管理系统
 
-一个以 C++ 为核心的学校人员管理作业项目。Web 界面由 C++ HTTP 服务托管，人员数据保存在 SQLite 数据库中；原有 C++ 控制台程序也保留。当前工作以 Windows 本地开发和运行为主。
+一个以 C++ 为核心的学校人员管理作业项目。Web 界面由 C++ HTTP 服务托管，人员数据保存在 SQLite 数据库中；原有 C++ 控制台程序也保留。支持 Windows 本地开发，以及 Ubuntu 上通过 Nginx、HTTPS 和 systemd 部署。
+
+## 服务器部署
+
+Ubuntu 配置、HTTPS 证书续期、数据库备份和更新步骤见 [deploy/README.md](deploy/README.md)。服务器部署使用独立管理员登录；数据库和实际凭据只保存在服务器，不进入 Git 仓库。
+
+当前运行地址：[https://swustmarket.xyz](https://swustmarket.xyz)。浏览器会弹出管理员登录框，凭据由管理员单独提供。2026 年 10 月 11 日已在 Ubuntu 24.04 上完成部署，验证页面、API、增删改查、重启后的数据库持久化和证书模拟续期。
 
 ## 本地启动
 
@@ -86,6 +92,7 @@ project6/
 │   ├── styles.css                       页面样式
 │   └── app.js                           前端交互和 API 请求
 ├── CMakeLists.txt                        跨平台构建配置
+├── deploy/                              Ubuntu 服务、Nginx 与运维配置
 ├── build.bat                            编译控制台程序
 ├── build_server.bat                     编译 Web 后端
 ├── start_server.bat                     编译并启动 Web 系统
@@ -130,7 +137,7 @@ $env:SCHOOL_ADMIN_PASSWORD = 'replace-this-example-password'
 .\start_server.bat
 ```
 
-服务拒绝在未配置登录凭据时监听非本机地址。当前使用范围为本地开发；HTTP Basic 配置是后端提供的登录能力，不代表已完成 HTTPS 或服务器发布配置。
+服务拒绝在未配置登录凭据时监听非本机地址。公网部署时使用 Nginx 提供 HTTPS，C++ 后端仅监听本机，并设置独立的管理员凭据；具体配置见服务器部署文档。
 
 ## HTTP API
 
@@ -204,15 +211,15 @@ cmake --build build-cmake --config Release
 .\build-cmake\server.exe
 ```
 
-Ubuntu 上可使用同一份源码构建（这里只说明编译，没有配置服务器发布）：
+Ubuntu 上可使用同一份源码构建；公网运行还需按服务器部署文档配置服务与 HTTPS：
 
 ```bash
 cmake -S . -B build-cmake -DCMAKE_BUILD_TYPE=Release
-cmake --build build-cmake -j
+cmake --build build-cmake -j1
 ./build-cmake/server
 ```
 
-运行时仍应保持当前工作目录为项目根目录，以正确读取 `web/` 和数据库路径。Windows 的批处理构建已提供直接使用 GCC/G++ 的入口；CMake 与 Ubuntu 构建需在相应环境中验证。
+运行时仍应保持当前工作目录为项目根目录，以正确读取 `web/` 和数据库路径。Windows 的批处理构建已提供直接使用 GCC/G++ 的入口；Ubuntu 24.04 已使用 GCC 13.3 和 CMake 3.28 编译并通过集成测试。
 
 ## 集成测试
 
@@ -231,7 +238,7 @@ python tests/test_api.py --server build-cmake/server.exe
 
 Linux 上同样支持 `python3 tests/test_api.py --server build-cmake/server`。测试自行选取空闲本机端口，使用临时目录和临时数据库，不访问项目现有 `school.db`；退出时关闭自己启动的服务进程。Windows 测试进程不显示额外控制台窗口。
 
-已在当前 Windows 环境编译并通过 13 组后端集成测试，覆盖健康检查、静态页面、教师与行政人员增删改查、工号重复和修改、人员类别切换、字段与 JSON 校验、超过 64 KiB 的请求被拒绝、Unicode 转义姓名和工资小数保存、并发重复工号、进程重启后持久化、Basic 登录、非法配置与损坏数据库拒绝启动、外部数据库锁导致 `503` 后恢复，以及数据库表或记录编码损坏时健康接口和列表接口返回 `503`。这些结果验证本地后端行为；CMake 与 Ubuntu 构建仍需在对应环境执行验证。
+已在 Windows 和 Ubuntu 24.04 环境编译并通过 13 组后端集成测试，覆盖健康检查、静态页面、教师与行政人员增删改查、工号重复和修改、人员类别切换、字段与 JSON 校验、超过 64 KiB 的请求被拒绝、Unicode 转义姓名和工资小数保存、并发重复工号、进程重启后持久化、Basic 登录、非法配置与损坏数据库拒绝启动、外部数据库锁导致 `503` 后恢复，以及数据库表或记录编码损坏时健康接口和列表接口返回 `503`。服务器还通过了公网 HTTPS 登录、静态资源、实际增删改查、systemd 重启后持久化、SQLite 在线备份及证书模拟续期验证；部署临时测试记录已删除。
 
 ## 本地问题排查
 

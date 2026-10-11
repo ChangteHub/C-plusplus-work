@@ -1,0 +1,24 @@
+[Unit]
+Description=School personnel management C++ service
+After=network.target
+
+[Service]
+Type=simple
+User=school-personnel
+Group=school-personnel
+WorkingDirectory=/opt/school-personnel/current
+EnvironmentFile=/etc/school-personnel/environment
+ExecStart=/opt/school-personnel/current/build-cmake/server
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/school-personnel
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
